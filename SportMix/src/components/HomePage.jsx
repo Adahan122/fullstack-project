@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Добавили для перехода на логин
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
@@ -7,8 +7,6 @@ import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
-
-// 👇 Добавили импорты компонентов для модального окна
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
@@ -21,14 +19,14 @@ import RecommendedSwiper from './RecommendedSwiper';
 import Footer from './Footer';
 
 function HomePage({ user, onLogout }) {
-  const navigate = useNavigate(); // Инициализируем навигатор
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [category, setCategory] = useState('all'); 
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [selectedBrands, setSelectedBrands] = useState([]);
-  const [searchQuery, setSearchQuery] = useState(''); // Стейт для поиска
+  const [searchQuery, setSearchQuery] = useState('');
 
   // --- ЛОГИКА ДЛЯ МОДАЛЬНОГО ОКНА АВТОРИЗАЦИИ ---
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -36,12 +34,11 @@ function HomePage({ user, onLogout }) {
   useEffect(() => {
     const hasSeenModal = localStorage.getItem('hasSeenAuthModal');
     
-    // Показываем только если юзер не авторизован и еще не видел модалку в этой сессии
     if (!user && !hasSeenModal) {
       const timer = setTimeout(() => {
         setAuthModalOpen(true);
-        localStorage.setItem('hasSeenAuthModal', 'true'); // Запоминаем, что показали
-      }, 3000); // 3000 мс = 3 секунды
+        localStorage.setItem('hasSeenAuthModal', 'true');
+      }, 3000);
       
       return () => clearTimeout(timer);
     }
@@ -51,13 +48,10 @@ function HomePage({ user, onLogout }) {
     setAuthModalOpen(false);
   };
 
-  // Метод, который мы повесим на действие «Заказать»
   const handleOrderAttempt = (product) => {
     if (!user) {
-      // Если юзер не авторизован — требуем войти
       setAuthModalOpen(true);
     } else {
-      // Здесь твоя будущая логика добавления в корзину
       setOpenSnackbar(false);
       setTimeout(() => {
         setSnackbarMessage(`Товар "${product.name || 'Товар'}" успешно добавлен в ваш заказ! 🚀`);
@@ -65,7 +59,6 @@ function HomePage({ user, onLogout }) {
       }, 10);
     }
   };
-  // ----------------------------------------
 
   // --- ЛОГИКА ДЛЯ СНЕКБАРА (УВЕДОМЛЕНИЙ) ---
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -74,7 +67,6 @@ function HomePage({ user, onLogout }) {
   const handleCloseSnackbar = (event, reason) => {
     setOpenSnackbar(false);
   };
-  // ----------------------------------------
 
   // --- ЛОГИКА ИЗБРАННОГО ---
   const [favorites, setFavorites] = useState(() => {
@@ -109,7 +101,6 @@ function HomePage({ user, onLogout }) {
       setOpenSnackbar(true);
     }, 10); 
   };
-  // -------------------------
 
   const catalogRef = useRef(null);
 
@@ -119,6 +110,7 @@ function HomePage({ user, onLogout }) {
     }
   };
 
+  // Запрос к бэкенду на Render
   useEffect(() => {
     fetch('https://backend-72bv.onrender.com/api/data')
       .then(async (res) => {
@@ -147,11 +139,9 @@ function HomePage({ user, onLogout }) {
     setSelectedBrands([]);
   }, [minPrice, maxPrice]);
 
-  // ГЛАВНАЯ ФУНКЦИЯ ФИЛЬТРАЦИИ
   const filterProducts = (arr) => {
     let filtered = arr;
 
-    // 1. Поиск по строке (регистронезависимый)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((item) => {
@@ -161,21 +151,17 @@ function HomePage({ user, onLogout }) {
       });
     }
 
-    // 2. Фильтрация по табам/категориям
     if (category === 'New') {
       filtered = filtered.filter((item) => item.is_new);
     } else if (category === 'Sale') {
       filtered = filtered.filter((item) => {
-        // Достаем старую цену в любом из двух вариантов
         const itemOldPrice = item.oldPrice || item.old_price;
-        // Показываем товар, если есть флаг распродажи ИЛИ есть старая цена
         return item.is_sale || itemOldPrice;
       });
     } else if (category !== 'all') {
       filtered = filtered.filter((item) => item.category === category);
     }
 
-    // 3. Сайдбар: цена и бренды
     filtered = filtered.filter((item) => {
       const priceOk = item.price >= priceRange[0] && item.price <= priceRange[1];
       const brandOk = selectedBrands.length === 0 || selectedBrands.includes(item.brand);
@@ -200,7 +186,6 @@ function HomePage({ user, onLogout }) {
     );
   };
 
-  // Проверка: крутил ли пользователь фильтры или искал что-то
   const isSidebarFiltered =
     selectedBrands.length > 0 || 
     priceRange[0] !== minPrice || 
@@ -216,15 +201,8 @@ function HomePage({ user, onLogout }) {
   };
 
   return (
-    <Box sx={{ 
-      bgcolor: '#F9FAFB', 
-      minHeight: '100vh', 
-      width: '100%', 
-      display: 'flex',
-      flexDirection: 'column' 
-    }}>
+    <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Пропсы поиска улетают в Header */}
       <Header 
         onCategoryChange={setCategory} 
         selectedCategory={category} 
@@ -236,33 +214,19 @@ function HomePage({ user, onLogout }) {
 
       <Box
         sx={{
-          minHeight: '65vh',
-          width: '100vw',
-          position: 'relative',
-          left: '50%',
-          right: '50%',
-          marginLeft: '-50vw',
-          marginRight: '-50vw',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          minHeight: '65vh', width: '100vw', position: 'relative', left: '50%', right: '50%',
+          marginLeft: '-50vw', marginRight: '-50vw', display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: `linear-gradient(135deg, rgba(15, 68, 158, 0.45) 0%, rgba(0, 0, 0, 0.7) 100%), url('https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?q=80&auto=format&fit=crop&w=1500&q=80') center/cover no-repeat fixed`,
-          mb: 6,
-          boxShadow: 'inset 0px -20px 30px -10px #F9FAFB', 
+          mb: 6, boxShadow: 'inset 0px -20px 30px -10px #F9FAFB', 
         }}
       >
         <Box sx={{ textAlign: 'center', color: '#fff', zIndex: 2, px: 3, maxWidth: '900px' }}>
           <Typography
             variant='h1'
             sx={{
-              fontWeight: 900,
-              fontSize: { xs: '2.8rem', sm: '4rem', md: '5.5rem' },
-              letterSpacing: '-0.03em',
-              lineHeight: 1.1,
-              textTransform: 'uppercase',
-              mb: 2,
-              fontFamily: '"Montserrat", "Roboto", sans-serif', 
-              textShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              fontWeight: 900, fontSize: { xs: '2.8rem', sm: '4rem', md: '5.5rem' },
+              letterSpacing: '-0.03em', lineHeight: 1.1, textTransform: 'uppercase', mb: 2,
+              fontFamily: '"Montserrat", "Roboto", sans-serif', textShadow: '0 10px 30px rgba(0,0,0,0.5)',
             }}
           >
             Раскрой свой <br /> потенциал
@@ -270,13 +234,8 @@ function HomePage({ user, onLogout }) {
           
           <Typography
             sx={{
-              fontSize: { xs: '1rem', md: '1.3rem' },
-              fontWeight: 400,
-              mb: 4,
-              opacity: 0.9,
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
-              maxWidth: '600px',
-              mx: 'auto'
+              fontSize: { xs: '1rem', md: '1.3rem' }, fontWeight: 400, mb: 4, opacity: 0.9,
+              textShadow: '0 2px 10px rgba(0,0,0,0.3)', maxWidth: '600px', mx: 'auto'
             }}
           >
             Лучшая экипировка для твоих новых спортивных рекордов с доставкой до двери.
@@ -286,25 +245,11 @@ function HomePage({ user, onLogout }) {
             variant='contained'
             onClick={handleScrollToCatalog}
             sx={{
-              borderRadius: '50px', 
-              bgcolor: '#fff',
-              color: '#0f449e',
-              fontWeight: 800,
-              fontSize: { xs: 15, md: 17 },
-              px: 6,
-              py: 2,
-              boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
-              textTransform: 'uppercase',
-              transition: 'all 0.3s ease',
-              '&:hover': { 
-                bgcolor: '#0f449e', 
-                color: '#fff',
-                boxShadow: '0 15px 25px rgba(15, 68, 158, 0.3)',
-                transform: 'translateY(-3px)'
-              },
-              '&:active': {
-                transform: 'translateY(-1px)'
-              }
+              borderRadius: '50px', bgcolor: '#fff', color: '#0f449e', fontWeight: 800,
+              fontSize: { xs: 15, md: 17 }, px: 6, py: 2, boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
+              textTransform: 'uppercase', transition: 'all 0.3s ease',
+              '&:hover': { bgcolor: '#0f449e', color: '#fff', boxShadow: '0 15px 25px rgba(15, 68, 158, 0.3)', transform: 'translateY(-3px)' },
+              '&:active': { transform: 'translateY(-1px)' }
             }}
           >
             Перейти к покупкам
@@ -327,22 +272,11 @@ function HomePage({ user, onLogout }) {
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 5 }}>
             
-            <Box sx={{ 
-              width: '280px', 
-              flexShrink: 0, 
-              display: { xs: 'none', lg: 'block' },
-              position: 'sticky',
-              top: '20px'
-            }}>
+            <Box sx={{ width: '280px', flexShrink: 0, display: { xs: 'none', lg: 'block' }, position: 'sticky', top: '20px' }}>
               <Sidebar
-                minPrice={minPrice}
-                maxPrice={maxPrice}
-                priceRange={priceRange}
-                onPriceChange={handlePriceChange}
-                brands={allBrands}
-                selectedBrands={selectedBrands}
-                onBrandChange={handleBrandChange}
-                products={data}
+                minPrice={minPrice} maxPrice={maxPrice} priceRange={priceRange}
+                onPriceChange={handlePriceChange} brands={allBrands} selectedBrands={selectedBrands}
+                onBrandChange={handleBrandChange} products={data}
               />
             </Box>
 
@@ -365,51 +299,22 @@ function HomePage({ user, onLogout }) {
                   <Typography sx={{ color: '#718096', mb: 4 }}>
                     Найдено товаров: <b>{allProducts.length}</b>
                   </Typography>
-                  <ProductGrid 
-                    products={allProducts} 
-                    favorites={favorites} 
-                    onToggleFavorite={toggleFavorite}
-                    onOrder={handleOrderAttempt} /* 👈 Добавили проп! */
-                  />
+                  <ProductGrid products={allProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
                 </Box>
               ) : (
                 <>
                   {(category === 'all' || category === 'Shoes' || category === 'Clothes' || category === 'Bags') && (
                     <Box sx={{ mb: 8 }}>
                       <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': {
-                          content: '""',
-                          display: 'block',
-                          width: '50px',
-                          height: '4px',
-                          bgcolor: '#0f449e',
-                          borderRadius: '2px',
-                          mt: 1
-                        }
+                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#0f449e', borderRadius: '2px', mt: 1 }
                       }}>
                         {getCatalogTitle()}
                       </Typography>
                       
-                      <ProductGrid 
-                        products={allProducts.slice(0, 8)} 
-                        favorites={favorites} 
-                        onToggleFavorite={toggleFavorite} 
-                        onOrder={handleOrderAttempt} /* 👈 Добавили проп! */
-                      />
+                      <ProductGrid products={allProducts.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
 
-                      <Box sx={{ 
-                        mt: 8, 
-                        p: 4, 
-                        bgcolor: '#FFF', 
-                        borderRadius: '16px', 
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.05)' 
-                      }}>
-                        <RecommendedSwiper 
-                          products={swiperProducts} 
-                          title="Рекомендуем также 🔥" 
-                          onToggleFavorite={toggleFavorite}
-                          onOrder={handleOrderAttempt} /* 👈 Добавили проп! */
-                        />
+                      <Box sx={{ mt: 8, p: 4, bgcolor: '#FFF', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                        <RecommendedSwiper products={swiperProducts} title="Рекомендуем также 🔥" onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
                       </Box>
                     </Box>
                   )}
@@ -417,48 +322,22 @@ function HomePage({ user, onLogout }) {
                   {category === 'New' && (
                     <Box sx={{ mb: 8 }}>
                       <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': {
-                          content: '""',
-                          display: 'block',
-                          width: '50px',
-                          height: '4px',
-                          bgcolor: '#FFB800',
-                          borderRadius: '2px',
-                          mt: 1
-                        }
+                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#FFB800', borderRadius: '2px', mt: 1 }
                       }}>
                         🔥 Свежие поступления
                       </Typography>
-                      <ProductGrid 
-                        products={newProducts} 
-                        favorites={favorites} 
-                        onToggleFavorite={toggleFavorite}
-                        onOrder={handleOrderAttempt} /* 👈 Добавили проп! */
-                      />
+                      <ProductGrid products={newProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
                     </Box>
                   )}
 
                   {category === 'Sale' && (
                     <Box sx={{ mb: 8 }}>
                       <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': {
-                          content: '""',
-                          display: 'block',
-                          width: '50px',
-                          height: '4px',
-                          bgcolor: '#E53E3E',
-                          borderRadius: '2px',
-                          mt: 1
-                        }
+                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#E53E3E', borderRadius: '2px', mt: 1 }
                       }}>
                         🏷️ Лучшие скидки
                       </Typography>
-                      <ProductGrid 
-                        products={allProducts} 
-                        favorites={favorites} 
-                        onToggleFavorite={toggleFavorite}
-                        onOrder={handleOrderAttempt} /* 👈 Добавили проп! */
-                      />
+                      <ProductGrid products={allProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
                     </Box>
                   )}
                 </>
@@ -470,100 +349,49 @@ function HomePage({ user, onLogout }) {
 
       <Footer />
 
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={2500}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity="success"
+      <Snackbar open={openSnackbar} autoHideDuration={2500} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+        <Alert onClose={handleCloseSnackbar} severity="success"
           sx={{ 
-            width: '100%', 
-            bgcolor: '#1A202C', 
-            color: '#fff',
-            fontWeight: 600,
-            borderRadius: '12px',
-            px: 3,
-            py: 1.5,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-            '& .MuiAlert-icon': { color: '#48BB78' },
-            '& .MuiAlert-action': { color: '#fff' }
+            width: '100%', bgcolor: '#1A202C', color: '#fff', fontWeight: 600, borderRadius: '12px', px: 3, py: 1.5,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)', '& .MuiAlert-icon': { color: '#48BB78' }, '& .MuiAlert-action': { color: '#fff' }
           }}
         >
           {snackbarMessage}
         </Alert>
       </Snackbar>
 
-      {/* --- КРАСИВОЕ МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ --- */}
-      <Dialog 
-        open={authModalOpen} 
-        onClose={handleCloseModal}
-        PaperProps={{
-          sx: { borderRadius: '20px', p: 1, maxWidth: '400px', position: 'relative' }
-        }}
-      >
-        {/* Кнопка-крестик для закрытия */}
-        <IconButton
-          onClick={handleCloseModal}
-          sx={{ position: 'absolute', right: 12, top: 12, color: '#718096' }}
-        >
+      {/* --- МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ --- */}
+      <Dialog open={authModalOpen} onClose={handleCloseModal} PaperProps={{ sx: { borderRadius: '20px', p: 1, maxWidth: '400px', position: 'relative' } }}>
+        <IconButton onClick={handleCloseModal} sx={{ position: 'absolute', right: 12, top: 12, color: '#718096' }}>
           <CloseIcon />
         </IconButton>
 
         <DialogContent sx={{ textAlign: 'center', mt: 3, mb: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A202C', mb: 1 }}>
-            Привет в SportShop! 👋
+            Привет, {user?.username || 'в SportShop'}! 👋
           </Typography>
           
           <Typography sx={{ color: '#718096', mb: 4, fontSize: '0.95rem' }}>
             Чтобы совершать покупки, отслеживать заказы и получать персональные скидки, войдите в аккаунт.
           </Typography>
 
-          {/* Кнопка Войти */}
           <Button
-            variant="contained"
-            fullWidth
-            onClick={() => {
-              setAuthModalOpen(false);
-              navigate('/login'); // Переходим на страницу логина
-            }}
-            sx={{ 
-              bgcolor: '#0f449e', 
-              fontWeight: 700, 
-              py: 1.5, 
-              borderRadius: '10px',
-              mb: 2,
-              '&:hover': { bgcolor: '#0b337a' }
-            }}
+            variant="contained" fullWidth
+            onClick={() => { setAuthModalOpen(false); navigate('/login'); }}
+            sx={{ bgcolor: '#0f449e', fontWeight: 700, py: 1.5, borderRadius: '10px', mb: 2, '&:hover': { bgcolor: '#0b337a' } }}
           >
             Войти в аккаунт
           </Button>
 
-          {/* Кнопка Зарегистрироваться */}
           <Button
-            variant="outlined"
-            fullWidth
-            onClick={() => {
-              setAuthModalOpen(false);
-              navigate('/register'); // Переходим на страницу регистрации
-            }}
-            sx={{ 
-              borderColor: '#0f449e', 
-              color: '#0f449e', 
-              fontWeight: 700, 
-              py: 1.5, 
-              borderRadius: '10px',
-              borderWidth: '2px',
-              '&:hover': { borderWidth: '2px', borderColor: '#0b337a', color: '#0b337a' }
-            }}
+            variant="outlined" fullWidth
+            onClick={() => { setAuthModalOpen(false); navigate('/register'); }}
+            sx={{ borderColor: '#0f449e', color: '#0f449e', fontWeight: 700, py: 1.5, borderRadius: '10px', borderWidth: '2px', '&:hover': { borderWidth: '2px', borderColor: '#0b337a', color: '#0b337a' } }}
           >
             Создать профиль
           </Button>
         </DialogContent>
       </Dialog>
-
     </Box>
   );
 }
