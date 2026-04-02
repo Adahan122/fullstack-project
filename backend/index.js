@@ -8,26 +8,27 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Секретный ключ для JWT (желательно вынести в .env файл как JWT_SECRET)
+// Секретный ключ для JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_123';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Настройка подключения к PostgreSQL
+// 👇 ИСПРАВЛЕНО: Гибкое подключение к базе данных
+const isProduction = process.env.NODE_ENV === 'production';
+
 const pool = new Pool({
-  user: 'postgres',
-  password: process.env.PGPASSWORD || '1234',
-  host: 'localhost',
-  port: 5432,
-  database: 'myshop',
+  // Если в .env есть DATABASE_URL (выдаст Render), используем её.
+  // Иначе стучимся в твою локальную базу
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:1234@localhost:5432/myshop',
+  ssl: isProduction ? { rejectUnauthorized: false } : false, // Render требует SSL для базы
 });
 
-pool.connect()
-  .then(() => console.log('Подключено к PostgreSQL (myshop)'))
+pool
+  .connect()
+  .then(() => console.log('Подключено к PostgreSQL'))
   .catch((err) => console.error('Ошибка подключения к базе:', err));
-
 
 // ============================================================
 // 1. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ
@@ -46,10 +47,9 @@ app.post('/api/auth/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // ИСПОЛЬЗУЕМ ТВОИ КОЛОНКИ: username и password_hash
     const result = await pool.query(
       'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
-      [username, email, hashedPassword]
+      [username, email, hashedPassword],
     );
 
     const newUser = result.rows[0];
@@ -74,7 +74,6 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // СРАВНИВАЕМ С КОЛОНКОЙ password_hash
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ error: 'Неверный email или пароль' });
@@ -84,7 +83,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: { id: user.id, username: user.username, email: user.email },
     });
   } catch (err) {
     console.error('Ошибка входа:', err);
@@ -95,10 +94,9 @@ app.post('/api/auth/login', async (req, res) => {
 // ============================================================
 // 2. MIDDLEWARE (ПРОСЛОЙКА) ДЛЯ ЗАЩИТЫ РОУТОВ
 // ============================================================
-// Эта функция проверяет токен, который прислал фронтенд
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Берем сам токен из "Bearer token"
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Доступ запрещен. Вы не авторизованы.' });
@@ -106,13 +104,12 @@ const authMiddleware = (req, res, next) => {
 
   try {
     const verified = jwt.verify(token, JWT_SECRET);
-    req.userId = verified.id; // Записываем id юзера в запрос
-    next(); // Идем дальше
+    req.userId = verified.id;
+    next();
   } catch (err) {
     res.status(400).json({ error: 'Неверный токен' });
   }
 };
-
 
 // ============================================================
 // 3. ДАННЫЕ И ПРОФИЛЬ (ЗАЩИЩЕННЫЕ)
@@ -121,7 +118,9 @@ const authMiddleware = (req, res, next) => {
 // Получение товаров (доступно всем)
 app.get('/api/data', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id ASC');
+    const result = await pool.query(
+      'SELECT id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id ASC',
+    );
     res.json(result.rows);
   } catch (err) {
     console.error('Ошибка при получении данных:', err);
@@ -129,11 +128,13 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
-// ПОЛУЧЕНИЕ профиля (Только для авторизованных!)
+// ПОЛУЧЕНИЕ профиля
 app.get('/api/profile', authMiddleware, async (req, res) => {
   try {
-    // Выбираем username вместо name
-    const result = await pool.query('SELECT id, username, email, phone, address, avatar, banner FROM users WHERE id = $1', [req.userId]);
+    const result = await pool.query(
+      'SELECT id, username, email, phone, address, avatar, banner FROM users WHERE id = $1',
+      [req.userId],
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Пользователь не найден' });
@@ -146,39 +147,16 @@ app.get('/api/profile', authMiddleware, async (req, res) => {
   }
 });
 
+// 👇 ИСПРАВЛЕНО: Оставлен только ОДИН роут обновления профиля (с полем username)
 app.put('/api/profile', authMiddleware, async (req, res) => {
   try {
     const { username, email, phone, address, avatar, banner } = req.body;
 
-    // Обновляем username вместо name
     const result = await pool.query(
       `UPDATE users 
        SET username = $1, email = $2, phone = $3, address = $4, avatar = $5, banner = $6 
        WHERE id = $7 RETURNING id, username, email, phone, address, avatar, banner`,
-      [username, email, phone, address, avatar, banner, req.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Ошибка при сохранении профиля:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ОБНОВЛЕНИЕ профиля (Только для авторизованных!)
-app.put('/api/profile', authMiddleware, async (req, res) => {
-  try {
-    const { name, email, phone, address, avatar, banner } = req.body;
-
-    const result = await pool.query(
-      `UPDATE users 
-       SET name = $1, email = $2, phone = $3, address = $4, avatar = $5, banner = $6 
-       WHERE id = $7 RETURNING id, name, email, phone, address, avatar, banner`,
-      [name, email, phone, address, avatar, banner, req.userId] // Обновляем именно ТОГО юзера, чей токен
+      [username, email, phone, address, avatar, banner, req.userId],
     );
 
     if (result.rows.length === 0) {
