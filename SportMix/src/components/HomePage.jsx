@@ -120,7 +120,7 @@ function HomePage({ user, onLogout }) {
   };
 
   useEffect(() => {
-    fetch('https://backend-72bv.onrender.com')
+    fetch('https://backend-72bv.onrender.com/api/data')
       .then(async (res) => {
         let json;
         try {
