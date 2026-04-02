@@ -10,13 +10,17 @@ function FavoritesPage() {
   const navigate = useNavigate();
   const [data, setData] = useState([]);
   
-  // Получаем избранное
+  // Безопасное получение юзера для хедера
+  const [user] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('favorites');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Загружаем товары так же, как и на главной
   useEffect(() => {
     fetch('http://localhost:5000/api/data')
       .then((res) => res.json())
@@ -26,25 +30,31 @@ function FavoritesPage() {
       .catch((err) => console.error('Ошибка загрузки:', err));
   }, []);
 
-  // Переключение лайка прямо со страницы избранного
+  // Безопасное переключение лайка (через коллбэк стейта)
   const toggleFavorite = (productId) => {
-    const updatedFavorites = favorites.includes(productId)
-      ? favorites.filter((id) => id !== productId)
-      : [...favorites, productId];
-      
-    setFavorites(updatedFavorites);
-    localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+    setFavorites((prevFavorites) => {
+      const updatedFavorites = prevFavorites.includes(productId)
+        ? prevFavorites.filter((id) => id !== productId)
+        : [...prevFavorites, productId];
+        
+      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+      return updatedFavorites;
+    });
   };
 
-  // Фильтруем товары, оставляя только те, чьи ID есть в избранном
   const favoriteProducts = data.filter((item) => favorites.includes(item.id));
 
   return (
     <Box sx={{ bgcolor: '#fff', minHeight: '100vh', width: '100%', overflowX: 'hidden' }}>
-      <Header favoritesCount={favorites.length} />
+      {/* Передаем юзера и пустые заглушки для поиска/категорий, чтобы хедер не ругался */}
+      <Header 
+        favoritesCount={favorites.length} 
+        user={user}
+        onCategoryChange={() => navigate('/')}
+        onSearchChange={() => navigate('/')}
+      />
 
       <Container maxWidth='xl' sx={{ mt: 4, mb: 8 }}>
-        {/* Кнопка назад */}
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate('/')}
