@@ -12,6 +12,9 @@ import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 
+// Импортируем базовый URL бэкенда
+import { API_URL } from '../config';
+
 import Header from './Header';
 import ProductGrid from './ProductGrid';
 import Sidebar from './Sidebar';
@@ -110,9 +113,9 @@ function HomePage({ user, onLogout }) {
     }
   };
 
-  // Запрос к бэкенду на Render
+  // Запрос к бэкенду динамически через конфиг
   useEffect(() => {
-    fetch('https://backend-72bv.onrender.com/api/data')
+    fetch(`${API_URL}/api/data`)
       .then(async (res) => {
         let json;
         try {

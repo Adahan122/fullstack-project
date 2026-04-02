@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// 1. ДОБАВИЛИ Snackbar и Alert в импорты
+// ДОБАВИЛИ Snackbar и Alert в импорты
 import {
   Box,
   Typography,
@@ -14,6 +14,10 @@ import {
 } from '@mui/material';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
+// Импортируем базовый URL бэкенда из конфига
+import { API_URL } from '../config';
+
 import Header from './Header';
 
 // Импортируем созданный контекст из App.jsx
@@ -30,14 +34,13 @@ function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
 
-  // 2. ДОБАВИЛИ СТЕЙТ ДЛЯ УВЕДОМЛЕНИЯ
+  // ДОБАВИЛИ СТЕЙТ ДЛЯ УВЕДОМЛЕНИЯ
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // Запрос данных с твоего бэкенда
+  // Запрос данных с бэкенда через конфиг
   useEffect(() => {
     setLoading(true);
-    // ТАК ДОЛЖНО БЫТЬ
-    fetch(`https://backend-72bv.onrender.com/api/data`)
+    fetch(`${API_URL}/api/data`)
       .then((res) => res.json())
       .then((data) => {
         // Ищем товар, сравнивая ID
@@ -78,7 +81,7 @@ function ProductPage() {
     }
 
     addToCart(product, selectedSize);
-    setOpenSnackbar(true); // 3. ВКЛЮЧАЕМ УВЕДОМЛЕНИЕ ПРИ КЛИКЕ
+    setOpenSnackbar(true); // ВКЛЮЧАЕМ УВЕДОМЛЕНИЕ ПРИ КЛИКЕ
   };
 
   return (
@@ -230,7 +233,7 @@ function ProductPage() {
         </Grid>
       </Container>
 
-      {/* 4. САМ КОМПОНЕНТ УВЕДОМЛЕНИЯ (ВСПЛЫВАЕТ СНИЗУ СПРАВА) */}
+      {/* САМ КОМПОНЕНТ УВЕДОМЛЕНИЯ (ВСПЛЫВАЕТ СНИЗУ СПРАВА) */}
       <Snackbar
         open={openSnackbar}
         autoHideDuration={3000} // Скроется само через 3 секунды
