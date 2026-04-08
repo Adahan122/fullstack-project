@@ -399,6 +399,10 @@ async function hasPurchasedProduct(userId, productId) {
   return result.rows.length > 0;
 }
 
+app.get("/healthz", (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;

@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: sportmix-api
+    runtime: node
+    rootDir: backend
+    region: frankfurt
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sportmix-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@sportmix.dev
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        value: SportMix Admin
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: web
+    name: sportmix-web
+    runtime: static
+    rootDir: SportMix
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+
+databases:
+  - name: sportmix-db
+    region: frankfurt
+    plan: free
