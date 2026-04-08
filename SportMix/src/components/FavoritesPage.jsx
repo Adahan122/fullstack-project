@@ -1,94 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Button } from '@mui/material';
-import Header from './Header';
-import ProductGrid from './ProductGrid';
-import Footer from './Footer';
-import { useNavigate } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Box, Button, Container, Typography } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { useNavigate } from "react-router-dom";
+
+import Footer from "./Footer";
+import Header from "./Header";
+import ProductGrid from "./ProductGrid";
+import { useApp } from "../context/app-context";
+import { useProducts } from "../hooks/useProducts";
 
 function FavoritesPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState([]);
-  
-  // Безопасное получение юзера для хедера
-  const [user] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const { favorites } = useApp();
+  const { products } = useProducts();
 
-  const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    fetch('http://localhost:5000/api/data')
-      .then((res) => res.json())
-      .then((json) => {
-        if (Array.isArray(json)) setData(json);
-      })
-      .catch((err) => console.error('Ошибка загрузки:', err));
-  }, []);
-
-  // Безопасное переключение лайка (через коллбэк стейта)
-  const toggleFavorite = (productId) => {
-    setFavorites((prevFavorites) => {
-      const updatedFavorites = prevFavorites.includes(productId)
-        ? prevFavorites.filter((id) => id !== productId)
-        : [...prevFavorites, productId];
-        
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-      return updatedFavorites;
-    });
-  };
-
-  const favoriteProducts = data.filter((item) => favorites.includes(item.id));
+  const favoriteProducts = products.filter((item) => favorites.includes(item.id));
 
   return (
-    <Box sx={{ bgcolor: '#fff', minHeight: '100vh', width: '100%', overflowX: 'hidden' }}>
-      {/* Передаем юзера и пустые заглушки для поиска/категорий, чтобы хедер не ругался */}
-      <Header 
-        favoritesCount={favorites.length} 
-        user={user}
-        onCategoryChange={() => navigate('/')}
-        onSearchChange={() => navigate('/')}
-      />
+    <Box sx={{ bgcolor: "#fff", minHeight: "100vh", width: "100%", overflowX: "hidden" }}>
+      <Header />
 
-      <Container maxWidth='xl' sx={{ mt: 4, mb: 8 }}>
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/')}
-          sx={{ color: '#000', mb: 3, textTransform: 'none', fontWeight: 600 }}
+          onClick={() => navigate("/")}
+          sx={{ color: "#000", mb: 3, textTransform: "none", fontWeight: 600 }}
         >
           Вернуться в магазин
         </Button>
 
-        <Typography variant='h4' sx={{ fontWeight: 800, color: '#1a1a1a', mb: 4 }}>
-          Избранное 🖤
+        <Typography variant="h4" sx={{ fontWeight: 800, color: "#1a1a1a", mb: 4 }}>
+          Избранное
         </Typography>
 
         {favoriteProducts.length > 0 ? (
-          <ProductGrid 
-            products={favoriteProducts} 
-            favorites={favorites} 
-            onToggleFavorite={toggleFavorite} 
-          />
+          <ProductGrid products={favoriteProducts} />
         ) : (
-          <Box sx={{ textAlign: 'center', py: 10 }}>
-            <Typography variant='h5' sx={{ color: '#888', mb: 2 }}>
+          <Box sx={{ textAlign: "center", py: 10 }}>
+            <Typography variant="h5" sx={{ color: "#888", mb: 2 }}>
               В избранном пока ничего нет
             </Typography>
             <Button
-              variant='contained'
-              onClick={() => navigate('/')}
-              sx={{ bgcolor: '#0f449e', textTransform: 'none', fontWeight: 600 }}
+              variant="contained"
+              onClick={() => navigate("/")}
+              sx={{ bgcolor: "#0f449e", textTransform: "none", fontWeight: 600 }}
             >
               Перейти к покупкам
             </Button>
           </Box>
         )}
       </Container>
-      
+
       <Footer />
     </Box>
   );

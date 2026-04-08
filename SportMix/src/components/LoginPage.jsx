@@ -1,110 +1,84 @@
-import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper, Container } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { Alert, Box, Button, TextField } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
-const LoginPage = ({ setUser }) => { // <-- Принимаем setUser
+import AuthShell from "./AuthShell";
+import { useApp } from "../context/app-context";
+import { loginUser } from "../lib/api";
+
+function LoginPage() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const { completeAuth } = useApp();
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    setFormData((currentForm) => ({ ...currentForm, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка входа');
-      }
-
-      // Сохраняем токен и данные юзера в localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Обновляем стейт в App.js (магия React без перезагрузок)
-      setUser(data.user);
-
-      // И перекидываем на главную
-      navigate('/');
-    } catch (err) {
-      setError(err.message);
+      const authPayload = await loginUser(formData);
+      completeAuth(authPayload);
+      navigate("/");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 10, mb: 10 }}>
-      <Paper elevation={0} sx={{ p: 5, borderRadius: '16px', border: '1px solid #EDF2F7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <Typography variant="h5" sx={{ fontWeight: 900, mb: 3, textAlign: 'center', color: '#1A202C' }}>
-          ВХОД В <span style={{ color: '#0f449e' }}>SPORTMIX</span>
-        </Typography>
+    <AuthShell
+      eyebrow="Вход"
+      title="Возвращайся к покупкам"
+      subtitle="Войди в аккаунт, чтобы продолжить покупки, сохранять избранное и следить за заказами."
+    >
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {error && <Alert severity="error" sx={{ borderRadius: "16px" }}>{error}</Alert>}
 
-        {error && (
-          <Typography color="error" sx={{ mb: 2, textAlign: 'center', fontSize: 14, fontWeight: 600 }}>
-            {error}
-          </Typography>
-        )}
+        <TextField
+          label="E-mail"
+          name="email"
+          type="email"
+          fullWidth
+          required
+          value={formData.email}
+          onChange={handleChange}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "18px", bgcolor: "#fff" } }}
+        />
+        <TextField
+          label="Пароль"
+          name="password"
+          type="password"
+          fullWidth
+          required
+          value={formData.password}
+          onChange={handleChange}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "18px", bgcolor: "#fff" } }}
+        />
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <TextField
-            label="E-mail"
-            name="email"
-            type="email"
-            fullWidth
-            required
-            value={formData.email}
-            onChange={handleChange}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-          <TextField
-            label="Пароль"
-            name="password"
-            type="password"
-            fullWidth
-            required
-            value={formData.password}
-            onChange={handleChange}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{ bgcolor: "#0f449e", py: 1.7, borderRadius: "18px", fontWeight: 900, boxShadow: "0 18px 32px rgba(15,68,158,0.22)", "&:hover": { bgcolor: "#0b3376" } }}
+        >
+          {isSubmitting ? "Входим..." : "Войти"}
+        </Button>
 
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            sx={{
-              bgcolor: '#0f449e',
-              py: 1.5,
-              borderRadius: '50px',
-              fontWeight: 800,
-              boxShadow: '0 4px 12px rgba(15, 68, 158, 0.2)',
-              '&:hover': { bgcolor: '#0b3376' }
-            }}
-          >
-            Войти
-          </Button>
-
-          <Button
-            variant="text"
-            fullWidth
-            onClick={() => navigate('/register')}
-            sx={{ color: '#718096', fontWeight: 600, textTransform: 'none' }}
-          >
-            Ещё нет аккаунта? Зарегистрироваться
-          </Button>
-        </Box>
-      </Paper>
-    </Container>
+        <Button variant="text" fullWidth onClick={() => navigate("/register")} sx={{ color: "#64748b", fontWeight: 800, textTransform: "none" }}>
+          Еще нет аккаунта? Зарегистрироваться
+        </Button>
+      </Box>
+    </AuthShell>
   );
-};
+}
 
 export default LoginPage;

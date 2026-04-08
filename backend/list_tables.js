@@ -1,4 +1,4 @@
-// Этот скрипт выводит список всех таблиц в вашей базе PostgreSQL
+
 const { Pool } = require('pg');
 require('dotenv').config();
 

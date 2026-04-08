@@ -1,346 +1,407 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
-import Typography from '@mui/material/Typography';
-import Container from '@mui/material/Container';
-import Button from '@mui/material/Button';
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
-import IconButton from '@mui/material/IconButton';
-import CloseIcon from '@mui/icons-material/Close';
+import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import Container from "@mui/material/Container";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import IconButton from "@mui/material/IconButton";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import CloseIcon from "@mui/icons-material/Close";
+import SearchOffIcon from "@mui/icons-material/SearchOff";
+import SouthRoundedIcon from "@mui/icons-material/SouthRounded";
 
-// Импортируем базовый URL бэкенда
-import { API_URL } from '../config';
+import Footer from "./Footer";
+import Header from "./Header";
+import ProductGrid from "./ProductGrid";
+import RecommendedSwiper from "./RecommendedSwiper";
+import Sidebar from "./Sidebar";
+import { useApp } from "../context/app-context";
+import { filterProducts, getPriceBounds, getRecommendedProducts } from "../lib/catalog";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useProducts } from "../hooks/useProducts";
 
-import Header from './Header';
-import ProductGrid from './ProductGrid';
-import Sidebar from './Sidebar';
-import RecommendedSwiper from './RecommendedSwiper';
-import Footer from './Footer';
-
-function HomePage({ user, onLogout }) {
+function HomePage() {
   const navigate = useNavigate();
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [category, setCategory] = useState('all'); 
-  const [priceRange, setPriceRange] = useState([0, 10000]);
-  const [selectedBrands, setSelectedBrands] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // --- ЛОГИКА ДЛЯ МОДАЛЬНОГО ОКНА АВТОРИЗАЦИИ ---
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-
-  useEffect(() => {
-    const hasSeenModal = localStorage.getItem('hasSeenAuthModal');
-    
-    if (!user && !hasSeenModal) {
-      const timer = setTimeout(() => {
-        setAuthModalOpen(true);
-        localStorage.setItem('hasSeenAuthModal', 'true');
-      }, 3000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [user]);
-
-  const handleCloseModal = () => {
-    setAuthModalOpen(false);
-  };
-
-  const handleOrderAttempt = (product) => {
-    if (!user) {
-      setAuthModalOpen(true);
-    } else {
-      setOpenSnackbar(false);
-      setTimeout(() => {
-        setSnackbarMessage(`Товар "${product.name || 'Товар'}" успешно добавлен в ваш заказ! 🚀`);
-        setOpenSnackbar(true);
-      }, 10);
-    }
-  };
-
-  // --- ЛОГИКА ДЛЯ СНЕКБАРА (УВЕДОМЛЕНИЙ) ---
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-
-  const handleCloseSnackbar = (event, reason) => {
-    setOpenSnackbar(false);
-  };
-
-  // --- ЛОГИКА ИЗБРАННОГО ---
-  const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-  }, [favorites]);
-
-  const toggleFavorite = (productId) => {
-    const isAdding = !favorites.includes(productId);
-    
-    setFavorites((prev) =>
-      isAdding
-        ? [...prev, productId]
-        : prev.filter((id) => id !== productId)
-    );
-
-    const product = data.find((item) => item.id === productId);
-    const productName = product ? product.name : 'Товар';
-
-    setOpenSnackbar(false);
-
-    setTimeout(() => {
-      setSnackbarMessage(
-        isAdding 
-          ? `"${productName}" добавлен в избранное 🖤` 
-          : `"${productName}" удален из избранного`
-      );
-      setOpenSnackbar(true);
-    }, 10); 
-  };
-
   const catalogRef = useRef(null);
+  const { hasSeenAuthPrompt, markAuthPromptSeen, user } = useApp();
+  const { products, loading, error } = useProducts();
+  const [category, setCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priceRange, setPriceRange] = useState(null);
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [onlyInStock, setOnlyInStock] = useState(false);
+  const [authPromoOpen, setAuthPromoOpen] = useState(false);
 
-  const handleScrollToCatalog = () => {
-    if (catalogRef.current) {
-      catalogRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  // Запрос к бэкенду динамически через конфиг
-  useEffect(() => {
-    fetch(`${API_URL}/api/data`)
-      .then(async (res) => {
-        let json;
-        try {
-          json = await res.json();
-        } catch (e) {
-          throw new Error('Некорректный ответ сервера');
-        }
-        if (json && json.error) throw new Error(json.error);
-        if (!Array.isArray(json)) throw new Error('Ответ сервера не является массивом данных.');
-        return json;
-      })
-      .then((data) => setData(data))
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const prices = data.map((item) => item.price).filter((v) => typeof v === 'number');
-  const minPrice = prices.length ? Math.min(...prices) : 0;
-  const maxPrice = prices.length ? Math.max(...prices) : 10000;
-  const allBrands = Array.from(new Set(data.map((item) => item.brand).filter(Boolean)));
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const debouncedSearchQuery = useDebouncedValue(deferredSearchQuery, 220);
+  const isSearchPending = searchQuery !== debouncedSearchQuery;
+  const { minPrice, maxPrice } = useMemo(() => getPriceBounds(products), [products]);
+  const effectivePriceRange = useMemo(() => priceRange || [minPrice, maxPrice], [maxPrice, minPrice, priceRange]);
 
   useEffect(() => {
-    setPriceRange([minPrice, maxPrice]);
-    setSelectedBrands([]);
-  }, [minPrice, maxPrice]);
-
-  const filterProducts = (arr) => {
-    let filtered = arr;
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((item) => {
-        const nameMatch = item.name ? item.name.toLowerCase().includes(query) : false;
-        const brandMatch = item.brand ? item.brand.toLowerCase().includes(query) : false;
-        return nameMatch || brandMatch;
-      });
+    if (user || hasSeenAuthPrompt) {
+      return undefined;
     }
 
-    if (category === 'New') {
-      filtered = filtered.filter((item) => item.is_new);
-    } else if (category === 'Sale') {
-      filtered = filtered.filter((item) => {
-        const itemOldPrice = item.oldPrice || item.old_price;
-        return item.is_sale || itemOldPrice;
-      });
-    } else if (category !== 'all') {
-      filtered = filtered.filter((item) => item.category === category);
-    }
+    const timer = setTimeout(() => {
+      setAuthPromoOpen(true);
+      markAuthPromptSeen();
+    }, 3000);
 
-    filtered = filtered.filter((item) => {
-      const priceOk = item.price >= priceRange[0] && item.price <= priceRange[1];
-      const brandOk = selectedBrands.length === 0 || selectedBrands.includes(item.brand);
-      return priceOk && brandOk;
+    return () => clearTimeout(timer);
+  }, [hasSeenAuthPrompt, markAuthPromptSeen, user]);
+
+  const filteredProducts = useMemo(() => {
+    const baseProducts = filterProducts(products, {
+      category,
+      priceRange: effectivePriceRange,
+      selectedBrands,
+      searchQuery: debouncedSearchQuery,
     });
 
-    return filtered;
+    if (!onlyInStock) {
+      return baseProducts;
+    }
+
+    return baseProducts.filter((item) => Number(item.stock || 0) > 0);
+  }, [category, debouncedSearchQuery, effectivePriceRange, onlyInStock, products, selectedBrands]);
+
+  const searchSuggestions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return [];
+    }
+
+    return products
+      .filter((item) =>
+        [item.name, item.brand, item.category].some((value) =>
+          value?.toLowerCase().includes(query),
+        ),
+      )
+      .slice(0, 5);
+  }, [products, searchQuery]);
+
+  const newProducts = useMemo(() => filteredProducts.filter((item) => item.is_new), [filteredProducts]);
+  const recommendedProducts = useMemo(() => getRecommendedProducts(products), [products]);
+
+  const isSidebarFiltered =
+    selectedBrands.length > 0 ||
+    effectivePriceRange[0] !== minPrice ||
+    effectivePriceRange[1] !== maxPrice ||
+    onlyInStock ||
+    debouncedSearchQuery.trim().length > 0;
+
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (category !== "all") {
+      chips.push({ key: "category", label: `Категория: ${category}` });
+    }
+
+    if (debouncedSearchQuery.trim()) {
+      chips.push({ key: "search", label: `Поиск: ${debouncedSearchQuery.trim()}` });
+    }
+
+    if (selectedBrands.length > 0) {
+      chips.push(...selectedBrands.map((brand) => ({ key: `brand-${brand}`, label: brand })));
+    }
+
+    if (onlyInStock) {
+      chips.push({ key: "stock", label: "Только в наличии" });
+    }
+
+    if (effectivePriceRange[0] !== minPrice || effectivePriceRange[1] !== maxPrice) {
+      chips.push({
+        key: "price",
+        label: `${effectivePriceRange[0].toLocaleString("ru-RU")} - ${effectivePriceRange[1].toLocaleString("ru-RU")} ₽`,
+      });
+    }
+
+    return chips;
+  }, [category, debouncedSearchQuery, effectivePriceRange, minPrice, maxPrice, onlyInStock, selectedBrands]);
+
+  const getCatalogTitle = () => {
+    if (category === "all") return "Наш лучший выбор";
+    if (category === "Shoes") return "Спортивная обувь";
+    if (category === "Clothes") return "Стильная одежда";
+    if (category === "Bags") return "Аксессуары и сумки";
+    if (category === "New") return "Свежие поступления";
+    if (category === "Sale") return "Лучшие скидки";
+    return "Результаты поиска";
   };
 
-  const newProducts = filterProducts(data.filter((item) => item.is_new));
-  const allProducts = filterProducts(data);
+  const handleScrollToCatalog = () => {
+    catalogRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  const swiperProducts = [...data]
-    .filter((item) => item.rating)
-    .sort((a, b) => (b.reviews || 0) + (b.rating || 0) - ((a.reviews || 0) + (a.rating || 0)))
-    .slice(0, 12);
-
-  const handlePriceChange = (e, newValue) => setPriceRange(newValue);
   const handleBrandChange = (brand) => {
-    setSelectedBrands((prev) =>
-      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand],
+    setSelectedBrands((currentBrands) =>
+      currentBrands.includes(brand)
+        ? currentBrands.filter((currentBrand) => currentBrand !== brand)
+        : [...currentBrands, brand],
     );
   };
 
-  const isSidebarFiltered =
-    selectedBrands.length > 0 || 
-    priceRange[0] !== minPrice || 
-    priceRange[1] !== maxPrice ||
-    searchQuery.length > 0;
-
-  const getCatalogTitle = () => {
-    if (category === 'all') return 'Наш лучший выбор';
-    if (category === 'Shoes') return 'Спортивная обувь';
-    if (category === 'Clothes') return 'Стильная одежда';
-    if (category === 'Bags') return 'Аксессуары и сумки';
-    return 'Результаты поиска';
+  const handleSearchChange = (value) => {
+    startTransition(() => {
+      setSearchQuery(value);
+    });
   };
 
+  const handleSuggestionSelect = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    navigate(`/product/${suggestion.id}`);
+  };
+
+  const resetSearchExperience = () => {
+    setSearchQuery("");
+    setCategory("all");
+    setSelectedBrands([]);
+    setOnlyInStock(false);
+    setPriceRange([minPrice, maxPrice]);
+  };
+
+  const closePromo = () => setAuthPromoOpen(false);
+
   return (
-    <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column' }}>
-      
-      <Header 
-        onCategoryChange={setCategory} 
-        selectedCategory={category} 
-        favoritesCount={favorites.length} 
+    <Box sx={{ bgcolor: "#eef4fb", minHeight: "100vh", width: "100%", display: "flex", flexDirection: "column" }}>
+      <Header
+        onCategoryChange={setCategory}
+        selectedCategory={category}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        user={user} onLogout={onLogout}
+        onSearchChange={handleSearchChange}
+        searchSuggestions={searchSuggestions}
+        searchResultsCount={filteredProducts.length}
+        searchIsPending={isSearchPending}
+        onSuggestionSelect={handleSuggestionSelect}
       />
 
       <Box
         sx={{
-          minHeight: '65vh', width: '100vw', position: 'relative', left: '50%', right: '50%',
-          marginLeft: '-50vw', marginRight: '-50vw', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `linear-gradient(135deg, rgba(15, 68, 158, 0.45) 0%, rgba(0, 0, 0, 0.7) 100%), url('https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?q=80&auto=format&fit=crop&w=1500&q=80') center/cover no-repeat fixed`,
-          mb: 6, boxShadow: 'inset 0px -20px 30px -10px #F9FAFB', 
+          minHeight: { xs: "72vh", md: "68vh" },
+          width: "100vw",
+          position: "relative",
+          left: "50%",
+          right: "50%",
+          marginLeft: "-50vw",
+          marginRight: "-50vw",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background:
+            "radial-gradient(circle at 15% 20%, rgba(125,211,252,0.28) 0%, transparent 22%), radial-gradient(circle at 80% 18%, rgba(96,165,250,0.20) 0%, transparent 24%), linear-gradient(125deg, rgba(15,23,42,0.76) 0%, rgba(15,68,158,0.66) 48%, rgba(37,99,235,0.58) 100%), url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&auto=format&fit=crop&w=1600') center/cover no-repeat",
+          mb: 6,
+          overflow: "hidden",
         }}
       >
-        <Box sx={{ textAlign: 'center', color: '#fff', zIndex: 2, px: 3, maxWidth: '900px' }}>
-          <Typography
-            variant='h1'
-            sx={{
-              fontWeight: 900, fontSize: { xs: '2.8rem', sm: '4rem', md: '5.5rem' },
-              letterSpacing: '-0.03em', lineHeight: 1.1, textTransform: 'uppercase', mb: 2,
-              fontFamily: '"Montserrat", "Roboto", sans-serif', textShadow: '0 10px 30px rgba(0,0,0,0.5)',
-            }}
-          >
-            Раскрой свой <br /> потенциал
-          </Typography>
-          
-          <Typography
-            sx={{
-              fontSize: { xs: '1rem', md: '1.3rem' }, fontWeight: 400, mb: 4, opacity: 0.9,
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)', maxWidth: '600px', mx: 'auto'
-            }}
-          >
-            Лучшая экипировка для твоих новых спортивных рекордов с доставкой до двери.
-          </Typography>
+        <Box sx={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(15,23,42,0.04) 0%, rgba(238,244,251,0.2) 100%)" }} />
 
-          <Button
-            variant='contained'
-            onClick={handleScrollToCatalog}
-            sx={{
-              borderRadius: '50px', bgcolor: '#fff', color: '#0f449e', fontWeight: 800,
-              fontSize: { xs: 15, md: 17 }, px: 6, py: 2, boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
-              textTransform: 'uppercase', transition: 'all 0.3s ease',
-              '&:hover': { bgcolor: '#0f449e', color: '#fff', boxShadow: '0 15px 25px rgba(15, 68, 158, 0.3)', transform: 'translateY(-3px)' },
-              '&:active': { transform: 'translateY(-1px)' }
-            }}
-          >
-            Перейти к покупкам
-          </Button>
-        </Box>
+        <Container maxWidth="xl" sx={{ position: "relative", zIndex: 2 }}>
+          <Box sx={{ maxWidth: "760px", px: { xs: 2, md: 4 } }}>
+            <Chip
+              icon={<AutoAwesomeIcon sx={{ fontSize: "16px !important" }} />}
+              label="Поиск стал быстрее и умнее"
+              sx={{
+                mb: 2.5,
+                color: "#fff",
+                backgroundColor: "rgba(255,255,255,0.14)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                backdropFilter: "blur(10px)",
+                fontWeight: 800,
+              }}
+            />
+
+            <Typography
+              variant="h1"
+              sx={{
+                fontWeight: 900,
+                fontSize: { xs: "2.9rem", sm: "4.2rem", md: "5.7rem" },
+                letterSpacing: "-0.06em",
+                lineHeight: 0.94,
+                color: "#fff",
+                mb: 2,
+                fontFamily: '"Montserrat", sans-serif',
+                textTransform: "uppercase",
+                textShadow: "0 18px 40px rgba(15,23,42,0.34)",
+              }}
+            >
+              Найди
+              <br />
+              свой ритм
+            </Typography>
+
+            <Typography
+              sx={{
+                fontSize: { xs: "1rem", md: "1.18rem" },
+                lineHeight: 1.8,
+                color: "rgba(255,255,255,0.84)",
+                maxWidth: "560px",
+                mb: 4,
+              }}
+            >
+              Ищи быстрее, фильтруй точнее и переходи к товару без лишнего шума. Мы сделали каталог более четким, воздушным и современным.
+            </Typography>
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+              <Button
+                variant="contained"
+                endIcon={<SouthRoundedIcon />}
+                onClick={handleScrollToCatalog}
+                sx={{
+                  borderRadius: "999px",
+                  bgcolor: "#fff",
+                  color: "#0f172a",
+                  fontWeight: 900,
+                  px: 4.2,
+                  py: 1.8,
+                  boxShadow: "0 20px 40px rgba(15,23,42,0.26)",
+                  "&:hover": { bgcolor: "#e2e8f0" },
+                }}
+              >
+                Открыть каталог
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => navigate("/favorites")}
+                sx={{
+                  borderRadius: "999px",
+                  color: "#fff",
+                  borderColor: "rgba(255,255,255,0.28)",
+                  fontWeight: 800,
+                  px: 4.2,
+                  py: 1.8,
+                  backdropFilter: "blur(8px)",
+                  "&:hover": { borderColor: "#fff", backgroundColor: "rgba(255,255,255,0.06)" },
+                }}
+              >
+                Посмотреть избранное
+              </Button>
+            </Stack>
+          </Box>
+        </Container>
       </Box>
 
-      <Container maxWidth='xl' sx={{ mb: 10, flex: 1 }}>
+      <Container maxWidth="xl" sx={{ mb: 10, flex: 1 }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-            <CircularProgress size={50} thickness={4} sx={{ color: '#0f449e' }} />
+          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
+            <CircularProgress size={52} thickness={4} sx={{ color: "#0f449e" }} />
           </Box>
         ) : error ? (
-          <Box sx={{ textAlign: 'center', mt: 8, p: 5, bgcolor: '#FFF5F5', borderRadius: '12px' }}>
-            <Typography variant='h5' sx={{ color: '#E53E3E', fontWeight: 700, mb: 1 }}>
-              Упс! Что-то пошло не так
+          <Paper elevation={0} sx={{ textAlign: "center", mt: 8, p: 5, bgcolor: "#fff5f5", borderRadius: "24px", border: "1px solid rgba(239,68,68,0.12)" }}>
+            <Typography variant="h5" sx={{ color: "#dc2626", fontWeight: 800, mb: 1 }}>
+              Не удалось загрузить каталог
             </Typography>
-            <Typography sx={{ color: '#718096' }}>{error.message}</Typography>
-          </Box>
+            <Typography sx={{ color: "#64748b" }}>{error.message}</Typography>
+          </Paper>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 5 }}>
-            
-            <Box sx={{ width: '280px', flexShrink: 0, display: { xs: 'none', lg: 'block' }, position: 'sticky', top: '20px' }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 4.5 }}>
+            <Box sx={{ width: "280px", flexShrink: 0, display: { xs: "none", lg: "block" }, position: "sticky", top: "24px" }}>
               <Sidebar
-                minPrice={minPrice} maxPrice={maxPrice} priceRange={priceRange}
-                onPriceChange={handlePriceChange} brands={allBrands} selectedBrands={selectedBrands}
-                onBrandChange={handleBrandChange} products={data}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                priceRange={effectivePriceRange}
+                onPriceChange={(_, nextRange) => setPriceRange(nextRange)}
+                selectedBrands={selectedBrands}
+                onBrandChange={handleBrandChange}
+                products={products}
               />
             </Box>
 
             <Box ref={catalogRef} sx={{ flex: 1, minWidth: 0 }}>
-              
-              {allProducts.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 10 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#1A202C', mb: 1 }}>
-                    Ничего не найдено 😢
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  p: { xs: 2, md: 3 },
+                  borderRadius: "28px",
+                  background: "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)",
+                  border: "1px solid rgba(148,163,184,0.14)",
+                  boxShadow: "0 24px 60px rgba(15,23,42,0.06)",
+                }}
+              >
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.75, letterSpacing: "-0.04em" }}>
+                      {getCatalogTitle()}
+                    </Typography>
+                    <Typography sx={{ color: "#64748b", fontWeight: 600 }}>
+                      {isSearchPending
+                        ? "Обновляем результаты..."
+                        : `Показываем ${filteredProducts.length} товаров по твоему запросу и фильтрам.`}
+                    </Typography>
+                  </Box>
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Chip
+                      label="Только в наличии"
+                      onClick={() => setOnlyInStock((current) => !current)}
+                      clickable
+                      sx={{
+                        backgroundColor: onlyInStock ? "#0f449e" : "#f8fafc",
+                        color: onlyInStock ? "#fff" : "#334155",
+                        fontWeight: 800,
+                        borderRadius: "999px",
+                        border: onlyInStock ? "none" : "1px solid rgba(148,163,184,0.16)",
+                      }}
+                    />
+                    {activeFilterChips.length > 0 ? (
+                      activeFilterChips.map((chip) => (
+                        <Chip key={chip.key} label={chip.label} sx={{ backgroundColor: "#eff6ff", color: "#0f449e", fontWeight: 800, borderRadius: "999px" }} />
+                      ))
+                    ) : (
+                      <Chip label="Без фильтров" sx={{ backgroundColor: "#f8fafc", color: "#64748b", fontWeight: 800, borderRadius: "999px" }} />
+                    )}
+                  </Stack>
+                </Stack>
+              </Paper>
+
+              {filteredProducts.length === 0 ? (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    textAlign: "center",
+                    py: 8,
+                    px: 3,
+                    borderRadius: "32px",
+                    background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+                    border: "1px solid rgba(148,163,184,0.14)",
+                    boxShadow: "0 24px 60px rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <Box sx={{ width: 92, height: 92, mx: "auto", mb: 2.5, borderRadius: "28px", display: "grid", placeItems: "center", background: "linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(14,165,233,0.18) 100%)" }}>
+                    <SearchOffIcon sx={{ fontSize: 42, color: "#0f449e" }} />
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: "#0f172a", mb: 1 }}>
+                    По этому запросу пока пусто
                   </Typography>
-                  <Typography sx={{ color: '#718096' }}>
-                    Попробуйте изменить запрос или сбросить фильтры.
+                  <Typography sx={{ color: "#64748b", maxWidth: 520, mx: "auto", mb: 3 }}>
+                    Попробуй убрать часть фильтров, ввести название бренда короче или вернуться к общему каталогу.
                   </Typography>
-                </Box>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} justifyContent="center">
+                    <Button variant="contained" onClick={resetSearchExperience} sx={{ borderRadius: "999px", px: 3.5, py: 1.4, fontWeight: 900, bgcolor: "#0f449e" }}>
+                      Сбросить поиск
+                    </Button>
+                    <Button variant="outlined" onClick={() => setCategory("all")} sx={{ borderRadius: "999px", px: 3.5, py: 1.4, fontWeight: 800 }}>
+                      Ко всем товарам
+                    </Button>
+                  </Stack>
+                </Paper>
               ) : isSidebarFiltered ? (
-                <Box sx={{ mb: 8 }}>
-                  <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 1, textAlign: 'left' }}>
-                    Результаты фильтрации
-                  </Typography>
-                  <Typography sx={{ color: '#718096', mb: 4 }}>
-                    Найдено товаров: <b>{allProducts.length}</b>
-                  </Typography>
-                  <ProductGrid products={allProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
-                </Box>
+                <ProductGrid products={filteredProducts} />
               ) : (
                 <>
-                  {(category === 'all' || category === 'Shoes' || category === 'Clothes' || category === 'Bags') && (
-                    <Box sx={{ mb: 8 }}>
-                      <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#0f449e', borderRadius: '2px', mt: 1 }
-                      }}>
-                        {getCatalogTitle()}
-                      </Typography>
-                      
-                      <ProductGrid products={allProducts.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
+                  <ProductGrid products={category === "New" ? newProducts : filteredProducts} />
 
-                      <Box sx={{ mt: 8, p: 4, bgcolor: '#FFF', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-                        <RecommendedSwiper products={swiperProducts} title="Рекомендуем также 🔥" onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
-                      </Box>
-                    </Box>
-                  )}
-
-                  {category === 'New' && (
-                    <Box sx={{ mb: 8 }}>
-                      <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#FFB800', borderRadius: '2px', mt: 1 }
-                      }}>
-                        🔥 Свежие поступления
-                      </Typography>
-                      <ProductGrid products={newProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
-                    </Box>
-                  )}
-
-                  {category === 'Sale' && (
-                    <Box sx={{ mb: 8 }}>
-                      <Typography variant='h4' sx={{ fontWeight: 800, color: '#1A202C', mb: 4, textAlign: 'left', position: 'relative',
-                        '&:after': { content: '""', display: 'block', width: '50px', height: '4px', bgcolor: '#E53E3E', borderRadius: '2px', mt: 1 }
-                      }}>
-                        🏷️ Лучшие скидки
-                      </Typography>
-                      <ProductGrid products={allProducts} favorites={favorites} onToggleFavorite={toggleFavorite} onOrder={handleOrderAttempt} />
+                  {(category === "all" || category === "Shoes" || category === "Clothes" || category === "Bags") && (
+                    <Box sx={{ mt: 8, p: { xs: 2.2, md: 4 }, bgcolor: "#fff", borderRadius: "30px", boxShadow: "0 24px 60px rgba(15,23,42,0.07)", border: "1px solid rgba(148,163,184,0.14)" }}>
+                      <RecommendedSwiper products={recommendedProducts} title="Рекомендуем также" />
                     </Box>
                   )}
                 </>
@@ -352,44 +413,40 @@ function HomePage({ user, onLogout }) {
 
       <Footer />
 
-      <Snackbar open={openSnackbar} autoHideDuration={2500} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-        <Alert onClose={handleCloseSnackbar} severity="success"
-          sx={{ 
-            width: '100%', bgcolor: '#1A202C', color: '#fff', fontWeight: 600, borderRadius: '12px', px: 3, py: 1.5,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.2)', '& .MuiAlert-icon': { color: '#48BB78' }, '& .MuiAlert-action': { color: '#fff' }
-          }}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-
-      {/* --- МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ --- */}
-      <Dialog open={authModalOpen} onClose={handleCloseModal} PaperProps={{ sx: { borderRadius: '20px', p: 1, maxWidth: '400px', position: 'relative' } }}>
-        <IconButton onClick={handleCloseModal} sx={{ position: 'absolute', right: 12, top: 12, color: '#718096' }}>
+      <Dialog open={authPromoOpen} onClose={closePromo} PaperProps={{ sx: { borderRadius: "24px", p: 1, maxWidth: "420px", position: "relative" } }}>
+        <IconButton onClick={closePromo} sx={{ position: "absolute", right: 12, top: 12, color: "#718096" }}>
           <CloseIcon />
         </IconButton>
 
-        <DialogContent sx={{ textAlign: 'center', mt: 3, mb: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A202C', mb: 1 }}>
-            Привет, {user?.username || 'в SportShop'}! 👋
+        <DialogContent sx={{ textAlign: "center", mt: 3, mb: 1 }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: "#1A202C", mb: 1 }}>
+            Привет, {user?.username || "гость"}!
           </Typography>
-          
-          <Typography sx={{ color: '#718096', mb: 4, fontSize: '0.95rem' }}>
-            Чтобы совершать покупки, отслеживать заказы и получать персональные скидки, войдите в аккаунт.
+
+          <Typography sx={{ color: "#718096", mb: 4, fontSize: "0.95rem" }}>
+            Чтобы сохранять избранное, оформлять покупки и отслеживать заказы, войди в аккаунт.
           </Typography>
 
           <Button
-            variant="contained" fullWidth
-            onClick={() => { setAuthModalOpen(false); navigate('/login'); }}
-            sx={{ bgcolor: '#0f449e', fontWeight: 700, py: 1.5, borderRadius: '10px', mb: 2, '&:hover': { bgcolor: '#0b337a' } }}
+            variant="contained"
+            fullWidth
+            onClick={() => {
+              closePromo();
+              navigate("/login");
+            }}
+            sx={{ bgcolor: "#0f449e", fontWeight: 800, py: 1.5, borderRadius: "14px", mb: 2, "&:hover": { bgcolor: "#0b337a" } }}
           >
             Войти в аккаунт
           </Button>
 
           <Button
-            variant="outlined" fullWidth
-            onClick={() => { setAuthModalOpen(false); navigate('/register'); }}
-            sx={{ borderColor: '#0f449e', color: '#0f449e', fontWeight: 700, py: 1.5, borderRadius: '10px', borderWidth: '2px', '&:hover': { borderWidth: '2px', borderColor: '#0b337a', color: '#0b337a' } }}
+            variant="outlined"
+            fullWidth
+            onClick={() => {
+              closePromo();
+              navigate("/register");
+            }}
+            sx={{ borderColor: "#0f449e", color: "#0f449e", fontWeight: 800, py: 1.5, borderRadius: "14px", borderWidth: "2px", "&:hover": { borderWidth: "2px", borderColor: "#0b337a", color: "#0b337a" } }}
           >
             Создать профиль
           </Button>

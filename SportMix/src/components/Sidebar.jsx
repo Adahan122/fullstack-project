@@ -1,23 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Slider from '@mui/material/Slider';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button'; // 🔥 ВОТ ОН, ЭТОТ ДОБАВЛЕННЫЙ ИМПОРТ!
+import { useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
+import Chip from "@mui/material/Chip";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormGroup from "@mui/material/FormGroup";
+import Slider from "@mui/material/Slider";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 
-const Sidebar = ({
+const formatNumber = (value) => Number(value || 0).toLocaleString("ru-RU");
+
+function Sidebar({
   minPrice,
   maxPrice,
   priceRange,
   onPriceChange,
-  products = [], // Передаем сюда все товары для подсчета количества
+  products = [],
   selectedBrands,
   onBrandChange,
-}) => {
-  // Локальный стейт для инпутов, чтобы ввод цифр не тормозил из-за тяжелого рендера каталога
+}) {
   const [localMin, setLocalMin] = useState(priceRange[0]);
   const [localMax, setLocalMax] = useState(priceRange[1]);
 
@@ -26,20 +31,24 @@ const Sidebar = ({
     setLocalMax(priceRange[1]);
   }, [priceRange]);
 
-  const handleMinInputChange = (e) => {
-    const val = e.target.value === '' ? '' : Number(e.target.value);
-    setLocalMin(val);
-  };
+  const brandCounts = useMemo(() => {
+    const counts = {};
 
-  const handleMaxInputChange = (e) => {
-    const val = e.target.value === '' ? '' : Number(e.target.value);
-    setLocalMax(val);
-  };
+    products.forEach((item) => {
+      if (item.brand) {
+        const formattedBrand = item.brand.charAt(0).toUpperCase() + item.brand.slice(1).toLowerCase();
+        counts[formattedBrand] = (counts[formattedBrand] || 0) + 1;
+      }
+    });
 
-  // Когда пользователь уводит фокус с инпута или жмет Enter — применяем фильтр
+    return counts;
+  }, [products]);
+
+  const formattedBrands = useMemo(() => Object.keys(brandCounts).sort(), [brandCounts]);
+
   const handleInputBlur = () => {
-    let min = localMin === '' ? minPrice : Math.max(minPrice, Math.min(localMin, maxPrice));
-    let max = localMax === '' ? maxPrice : Math.max(minPrice, Math.min(localMax, maxPrice));
+    let min = localMin === "" ? minPrice : Math.max(minPrice, Math.min(localMin, maxPrice));
+    let max = localMax === "" ? maxPrice : Math.max(minPrice, Math.min(localMax, maxPrice));
 
     if (min > max) {
       const temp = min;
@@ -50,148 +59,152 @@ const Sidebar = ({
     onPriceChange(null, [min, max]);
   };
 
-  // 1. Приводим бренды к единому регистру и считаем их количество
-  const brandCounts = {};
-  products.forEach((item) => {
-    if (item.brand) {
-      // Делаем первую букву заглавной, остальные строчными (NIKE -> Nike)
-      const formattedBrand = item.brand.charAt(0).toUpperCase() + item.brand.slice(1).toLowerCase();
-      brandCounts[formattedBrand] = (brandCounts[formattedBrand] || 0) + 1;
-    }
-  });
-
-  const formattedBrands = Object.keys(brandCounts).sort();
-
   return (
-    <Box sx={{ width: 260, p: 3, bgcolor: '#f7f8fa', borderRadius: 3, boxShadow: 1 }}>
-      {/* СЕКЦИЯ: ЦЕНА */}
-      <Typography variant='subtitle1' sx={{ fontWeight: 800, mb: 1.5, color: '#1a1a1a' }}>
-        Цена
-      </Typography>
+    <Box
+      sx={{
+        width: 280,
+        p: 3,
+        borderRadius: "28px",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+        border: "1px solid rgba(148,163,184,0.14)",
+        boxShadow: "0 24px 60px rgba(15,23,42,0.06)",
+      }}
+    >
+      <Box sx={{ mb: 3 }}>
+        <Typography sx={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase", color: "#0f449e", mb: 0.9 }}>
+          Фильтры
+        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", letterSpacing: "-0.03em" }}>
+          Настрой свой поиск
+        </Typography>
+        <Typography sx={{ color: "#64748b", fontSize: "14px", mt: 0.75, lineHeight: 1.6 }}>
+          Сузь каталог по цене и брендам, чтобы быстрее найти точное попадание.
+        </Typography>
+      </Box>
 
-      {/* Текстовый диапазон */}
-      <Typography variant='body2' sx={{ color: '#555', mb: 2, fontWeight: 500 }}>
-        от {priceRange[0].toLocaleString()} ₽ до {priceRange[1].toLocaleString()} ₽
-      </Typography>
+      <Box sx={{ p: 2, borderRadius: "20px", backgroundColor: "#f8fafc", border: "1px solid rgba(148,163,184,0.12)", mb: 3 }}>
+        <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 1.2 }}>Цена</Typography>
+        <Typography sx={{ color: "#64748b", mb: 2, fontWeight: 600, fontSize: "14px" }}>
+          от {formatNumber(priceRange[0])} ₽ до {formatNumber(priceRange[1])} ₽
+        </Typography>
 
-      {/* Инпуты для ручного ввода */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <TextField
-          value={localMin}
-          size='small'
-          onChange={handleMinInputChange}
-          onBlur={handleInputBlur}
-          onKeyDown={(e) => e.key === 'Enter' && handleInputBlur()}
-          inputProps={{ style: { fontSize: 14, padding: '6px 8px' } }}
-          placeholder='от'
-        />
-        <Typography sx={{ color: '#aaa' }}>—</Typography>
-        <TextField
-          value={localMax}
-          size='small'
-          onChange={handleMaxInputChange}
-          onBlur={handleInputBlur}
-          onKeyDown={(e) => e.key === 'Enter' && handleInputBlur()}
-          inputProps={{ style: { fontSize: 14, padding: '6px 8px' } }}
-          placeholder='до'
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          <TextField
+            value={localMin}
+            size="small"
+            onChange={(event) => setLocalMin(event.target.value === "" ? "" : Number(event.target.value))}
+            onBlur={handleInputBlur}
+            onKeyDown={(event) => event.key === "Enter" && handleInputBlur()}
+            inputProps={{ style: { fontSize: 14, padding: "10px 12px", fontWeight: 700 } }}
+            placeholder="от"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "14px", bgcolor: "#fff" } }}
+          />
+          <Typography sx={{ color: "#94a3b8", fontWeight: 800 }}>—</Typography>
+          <TextField
+            value={localMax}
+            size="small"
+            onChange={(event) => setLocalMax(event.target.value === "" ? "" : Number(event.target.value))}
+            onBlur={handleInputBlur}
+            onKeyDown={(event) => event.key === "Enter" && handleInputBlur()}
+            inputProps={{ style: { fontSize: 14, padding: "10px 12px", fontWeight: 700 } }}
+            placeholder="до"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "14px", bgcolor: "#fff" } }}
+          />
+        </Box>
+
+        <Slider
+          value={priceRange}
+          onChange={onPriceChange}
+          min={minPrice}
+          max={maxPrice}
+          sx={{
+            color: "#0f449e",
+            height: 6,
+            "& .MuiSlider-track": { border: "none" },
+            "& .MuiSlider-rail": { backgroundColor: "#dbeafe" },
+            "& .MuiSlider-thumb": {
+              width: 20,
+              height: 20,
+              backgroundColor: "#fff",
+              border: "3px solid currentColor",
+              boxShadow: "0 8px 20px rgba(15,68,158,0.20)",
+            },
+          }}
         />
       </Box>
 
-      {/* Ползунок */}
-      <Slider
-        value={priceRange}
-        onChange={onPriceChange}
-        min={minPrice}
-        max={maxPrice}
-        sx={{
-          mb: 4,
-          color: '#0f449e',
-          height: 4,
-          '& .MuiSlider-thumb': {
-            width: 18,
-            height: 18,
-            backgroundColor: '#fff',
-            border: '2px solid currentColor',
-          },
-        }}
-      />
+      <Box sx={{ p: 2, borderRadius: "20px", backgroundColor: "#f8fafc", border: "1px solid rgba(148,163,184,0.12)" }}>
+        <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 1.4 }}>Бренды</Typography>
 
-      {/* СЕКЦИЯ: БРЕНДЫ */}
-      <Typography variant='subtitle1' sx={{ fontWeight: 800, mb: 1.5, color: '#1a1a1a' }}>
-        Бренды
-      </Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+          <Chip icon={<AutoAwesomeIcon />} label={`${formattedBrands.length} брендов`} sx={{ bgcolor: "#fff", color: "#0f449e", fontWeight: 800 }} />
+          <Chip icon={<LocalOfferIcon />} label={`${selectedBrands.length} выбрано`} sx={{ bgcolor: "#fff", color: "#0f172a", fontWeight: 800 }} />
+        </Stack>
 
-      <FormGroup>
-        {formattedBrands.map((brand) => {
-          const isChecked = selectedBrands.some((b) => b.toLowerCase() === brand.toLowerCase());
+        <FormGroup sx={{ maxHeight: 280, overflowY: "auto", pr: 0.5 }}>
+          {formattedBrands.map((brand) => {
+            const isChecked = selectedBrands.some((selectedBrand) => selectedBrand.toLowerCase() === brand.toLowerCase());
 
-          return (
-            <FormControlLabel
-              key={brand}
-              control={
-                <Checkbox
-                  checked={isChecked}
-                  onChange={() => {
-                    const originalBrand =
-                      Object.keys(brandCounts).find(
-                        (k) => k.toLowerCase() === brand.toLowerCase(),
-                      ) || brand;
-                    onBrandChange(originalBrand);
-                  }}
-                  sx={{ color: '#bbb', '&.Mui-checked': { color: '#0f449e' } }}
-                />
-              }
-              label={
-                <Typography variant='body2' sx={{ fontWeight: 500, color: '#333' }}>
-                  {brand}{' '}
-                  <span style={{ color: '#aaa', fontSize: '0.85rem' }}>({brandCounts[brand]})</span>
-                </Typography>
-              }
-              sx={{ mb: 0.5 }}
-            />
-          );
-        })}
-      </FormGroup>
+            return (
+              <FormControlLabel
+                key={brand}
+                control={
+                  <Checkbox
+                    checked={isChecked}
+                    onChange={() => {
+                      const originalBrand =
+                        Object.keys(brandCounts).find((key) => key.toLowerCase() === brand.toLowerCase()) || brand;
+                      onBrandChange(originalBrand);
+                    }}
+                    sx={{ color: "#cbd5e1", "&.Mui-checked": { color: "#0f449e" } }}
+                  />
+                }
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", pr: 1 }}>
+                    <Typography sx={{ fontWeight: 700, color: "#334155", fontSize: "14px" }}>{brand}</Typography>
+                    <Typography sx={{ color: "#94a3b8", fontSize: "12px", fontWeight: 800 }}>{brandCounts[brand]}</Typography>
+                  </Box>
+                }
+                sx={{
+                  m: 0,
+                  px: 0.5,
+                  py: 0.35,
+                  borderRadius: "14px",
+                  "&:hover": { backgroundColor: "rgba(255,255,255,0.8)" },
+                }}
+              />
+            );
+          })}
+        </FormGroup>
+      </Box>
 
-      {/* Баннер в пустоту под фильтрами */}
       <Box
         sx={{
           mt: 3,
-          width: '80%',
-          height: '650px',
-          borderRadius: '12px',
+          borderRadius: "24px",
           background:
-            'linear-gradient(rgba(15, 68, 158, 0.8), rgba(11, 51, 118, 0.8)), url("https://images.unsplash.com/photo-1556906781-9a412961c28c?q=80&auto=format&fit=crop") center/cover',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          color: '#fff',
-          p: 3,
-          textAlign: 'center',
+            "linear-gradient(160deg, rgba(15,23,42,0.90) 0%, rgba(15,68,158,0.86) 50%, rgba(37,99,235,0.80) 100%), url('https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&auto=format&fit=crop&w=800') center/cover",
+          color: "#fff",
+          p: 2.5,
+          overflow: "hidden",
+          position: "relative",
         }}
       >
-        <Typography variant='h6' sx={{ fontWeight: 'bold', mb: 1 }}>
-          СКИДКИ ДО -50%
+        <Typography sx={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.72)", mb: 0.8 }}>
+          Curated Pick
         </Typography>
-        <Typography variant='body2' sx={{ mb: 2 }}>
-          На все кроссовки из новой коллекции
+        <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
+          До -50% на трендовые кроссовки
         </Typography>
-        <Button
-          variant='contained'
-          sx={{
-            bgcolor: '#fff',
-            color: '#0f449e',
-            '&:hover': { bgcolor: '#f0f0f0' },
-            textTransform: 'none',
-            fontWeight: 'bold',
-          }}
-        >
-          Смотреть
+        <Typography sx={{ color: "rgba(255,255,255,0.82)", fontSize: "14px", lineHeight: 1.6, mb: 2 }}>
+          Собрали самые заметные модели сезона, чтобы ты нашел пару быстрее.
+        </Typography>
+        <Button variant="contained" sx={{ bgcolor: "#fff", color: "#0f172a", borderRadius: "999px", fontWeight: 900, px: 2.5, "&:hover": { bgcolor: "#e2e8f0" } }}>
+          Смотреть подборку
         </Button>
       </Box>
     </Box>
   );
-};
+}
 
 export default Sidebar;

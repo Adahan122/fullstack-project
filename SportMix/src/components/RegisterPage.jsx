@@ -1,118 +1,93 @@
-import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper, Container } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { Alert, Box, Button, TextField } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
-const RegisterPage = ({ setUser }) => { // <-- Принимаем setUser
+import AuthShell from "./AuthShell";
+import { useApp } from "../context/app-context";
+import { registerUser } from "../lib/api";
+
+function RegisterPage() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
-  const [error, setError] = useState('');
+  const { completeAuth } = useApp();
+  const [formData, setFormData] = useState({ username: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    setFormData((currentForm) => ({ ...currentForm, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка при регистрации');
-      }
-
-      // Сохраняем токен и перекидываем на главную
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Магически обновляем стейт юзера
-      setUser(data.user);
-
-      navigate('/');
-    } catch (err) {
-      setError(err.message);
+      const authPayload = await registerUser(formData);
+      completeAuth(authPayload);
+      navigate("/");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8, mb: 10 }}>
-      <Paper elevation={0} sx={{ p: 5, borderRadius: '16px', border: '1px solid #EDF2F7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <Typography variant="h5" sx={{ fontWeight: 900, mb: 3, textAlign: 'center', color: '#1A202C' }}>
-          РЕГИСТРАЦИЯ
-        </Typography>
+    <AuthShell
+      eyebrow="Регистрация"
+      title="Создай свой профиль"
+      subtitle="Сохраняй любимые товары, управляй покупками и собирай свой каталог без лишней суеты."
+    >
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {error && <Alert severity="error" sx={{ borderRadius: "16px" }}>{error}</Alert>}
 
-        {error && (
-          <Typography color="error" sx={{ mb: 2, textAlign: 'center', fontSize: 14, fontWeight: 600 }}>
-            {error}
-          </Typography>
-        )}
+        <TextField
+          label="Имя пользователя"
+          name="username"
+          fullWidth
+          required
+          value={formData.username}
+          onChange={handleChange}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "18px", bgcolor: "#fff" } }}
+        />
+        <TextField
+          label="E-mail"
+          name="email"
+          type="email"
+          fullWidth
+          required
+          value={formData.email}
+          onChange={handleChange}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "18px", bgcolor: "#fff" } }}
+        />
+        <TextField
+          label="Пароль"
+          name="password"
+          type="password"
+          fullWidth
+          required
+          value={formData.password}
+          onChange={handleChange}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "18px", bgcolor: "#fff" } }}
+        />
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <TextField
-            label="Имя пользователя"
-            name="username"
-            fullWidth
-            required
-            value={formData.username}
-            onChange={handleChange}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-          <TextField
-            label="E-mail"
-            name="email"
-            type="email"
-            fullWidth
-            required
-            value={formData.email}
-            onChange={handleChange}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-          <TextField
-            label="Пароль"
-            name="password"
-            type="password"
-            fullWidth
-            required
-            value={formData.password}
-            onChange={handleChange}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{ bgcolor: "#0f449e", py: 1.7, borderRadius: "18px", fontWeight: 900, boxShadow: "0 18px 32px rgba(15,68,158,0.22)", "&:hover": { bgcolor: "#0b3376" } }}
+        >
+          {isSubmitting ? "Создаем аккаунт..." : "Создать аккаунт"}
+        </Button>
 
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            sx={{
-              bgcolor: '#0f449e',
-              py: 1.5,
-              borderRadius: '50px',
-              fontWeight: 800,
-              boxShadow: '0 4px 12px rgba(15, 68, 158, 0.2)',
-              '&:hover': { bgcolor: '#0b3376' }
-            }}
-          >
-            Создать аккаунт
-          </Button>
-
-          <Button
-            variant="text"
-            fullWidth
-            onClick={() => navigate('/login')}
-            sx={{ color: '#718096', fontWeight: 600, textTransform: 'none' }}
-          >
-            Уже есть аккаунт? Войти
-          </Button>
-        </Box>
-      </Paper>
-    </Container>
+        <Button variant="text" fullWidth onClick={() => navigate("/login")} sx={{ color: "#64748b", fontWeight: 800, textTransform: "none" }}>
+          Уже есть аккаунт? Войти
+        </Button>
+      </Box>
+    </AuthShell>
   );
-};
+}
 
 export default RegisterPage;
