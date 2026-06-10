@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Avatar,
   Box,
@@ -15,64 +15,77 @@ import {
   TextField,
   Tooltip,
   Typography,
-} from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
-import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
-import { useNavigate } from "react-router-dom";
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
+import { useNavigate } from 'react-router-dom';
 
-import { useApp } from "../context/app-context";
-import { fetchOrders, fetchProfile, updateProfile } from "../lib/api";
-import { formatCurrency } from "../lib/format";
+import { useApp } from '../context/app-context';
+import { fetchOrders, fetchProfile, updateProfile } from '../lib/api';
+import { formatCurrency } from '../lib/format';
 
 const emptyProfile = {
-  username: "",
-  email: "",
-  phone: "",
-  address: "",
-  avatar: "",
-  banner: "",
+  username: '',
+  email: '',
+  phone: '',
+  address: '',
+  avatar: '',
+  role: 'customer',
+  createdAt: '',
 };
 
 const statusMeta = {
   processing: {
-    label: "В обработке",
-    color: "info",
+    label: 'В обработке',
+    color: 'info',
     icon: <ShoppingBagOutlinedIcon />,
   },
   shipped: {
-    label: "В пути",
-    color: "warning",
+    label: 'В пути',
+    color: 'warning',
     icon: <LocalShippingOutlinedIcon />,
   },
   delivered: {
-    label: "Доставлен",
-    color: "success",
+    label: 'Доставлен',
+    color: 'success',
     icon: <CheckCircleOutlineIcon />,
   },
 };
 
+function getRoleLabel(role) {
+  return role === 'admin' ? 'Администратор' : 'Покупатель';
+}
+
+function formatMemberSince(createdAt) {
+  if (!createdAt) {
+    return 'Недавно';
+  }
+
+  return new Date(createdAt).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 function ProfilePage() {
   const navigate = useNavigate();
   const avatarInputRef = useRef(null);
-  const bannerInputRef = useRef(null);
-  const { setUser, token, user } = useApp();
+  const { setUser, showToast, token, user } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [orders, setOrders] = useState([]);
   const [profile, setProfile] = useState({
     ...emptyProfile,
-    username: user?.username || "",
-    email: user?.email || "",
+    username: user?.username || '',
+    email: user?.email || '',
   });
-  const [bannerPreview, setBannerPreview] = useState(
-    "linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(15,68,158,0.90) 48%, rgba(37,99,235,0.82) 100%)",
-  );
 
   useEffect(() => {
     if (!token) {
@@ -82,21 +95,19 @@ function ProfilePage() {
     fetchProfile(token)
       .then((data) => {
         const nextProfile = {
-          username: data.username || user?.username || "",
-          email: data.email || user?.email || "",
-          phone: data.phone || "",
-          address: data.address || "",
-          avatar: data.avatar || "",
-          banner: data.banner || "",
+          username: data.username || user?.username || '',
+          email: data.email || user?.email || '',
+          phone: data.phone || '',
+          address: data.address || '',
+          avatar: data.avatar || '',
+          role: data.role || 'customer',
+          createdAt: data.created_at || '',
         };
 
         setProfile(nextProfile);
-        if (nextProfile.banner) {
-          setBannerPreview(nextProfile.banner);
-        }
       })
       .catch((error) => {
-        console.error("Ошибка загрузки профиля:", error);
+        console.error('Ошибка загрузки профиля:', error);
       });
   }, [token, user?.email, user?.username]);
 
@@ -108,7 +119,7 @@ function ProfilePage() {
     fetchOrders(token)
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .catch((error) => {
-        console.error("Ошибка загрузки заказов:", error);
+        console.error('Ошибка загрузки заказов:', error);
         setOrders([]);
       });
   }, [token]);
@@ -121,6 +132,25 @@ function ProfilePage() {
       })),
     [orders],
   );
+
+  const totalSpent = useMemo(
+    () => orders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+    [orders],
+  );
+
+  const deliveredOrdersCount = useMemo(
+    () => orders.filter((order) => order.status === 'delivered').length,
+    [orders],
+  );
+
+  const profileCompletion = useMemo(() => {
+    const fields = [profile.username, profile.email, profile.phone, profile.address];
+    const filled = fields.filter((value) => String(value || '').trim()).length;
+    return Math.round((filled / fields.length) * 100);
+  }, [profile.address, profile.email, profile.phone, profile.username]);
+
+  const roleLabel = useMemo(() => getRoleLabel(profile.role), [profile.role]);
+  const memberSinceLabel = useMemo(() => formatMemberSince(profile.createdAt), [profile.createdAt]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -135,34 +165,33 @@ function ProfilePage() {
         phone: profile.phone,
         address: profile.address,
         avatar: profile.avatar,
-        banner: profile.banner || bannerPreview,
       });
 
-      setProfile({
-        username: savedProfile.username || "",
-        email: savedProfile.email || "",
-        phone: savedProfile.phone || "",
-        address: savedProfile.address || "",
-        avatar: savedProfile.avatar || "",
-        banner: savedProfile.banner || "",
-      });
+      setProfile((currentProfile) => ({
+        ...currentProfile,
+        username: savedProfile.username || '',
+        email: savedProfile.email || '',
+        phone: savedProfile.phone || '',
+        address: savedProfile.address || '',
+        avatar: savedProfile.avatar || '',
+        role: savedProfile.role || currentProfile.role || 'customer',
+        createdAt: savedProfile.created_at || currentProfile.createdAt || '',
+      }));
       setUser((currentUser) => ({
         ...(currentUser || {}),
         username: savedProfile.username,
         email: savedProfile.email,
       }));
-      if (savedProfile.banner) {
-        setBannerPreview(savedProfile.banner);
-      }
       setIsEditing(false);
+      showToast('Профиль сохранён');
     } catch (error) {
-      console.error("Ошибка сохранения профиля:", error);
-      alert(error.message || "Не удалось сохранить профиль");
+      console.error('Ошибка сохранения профиля:', error);
+      showToast(error.message || 'Не удалось сохранить профиль', 'error');
     }
   };
 
   const readImageFile = (file, onLoad) => {
-    if (!file || !file.type.startsWith("image/")) {
+    if (!file || !file.type.startsWith('image/')) {
       return;
     }
 
@@ -177,243 +206,436 @@ function ProfilePage() {
     });
   };
 
-  const handleBannerChange = (event) => {
-    readImageFile(event.target.files?.[0], (result) => {
-      setBannerPreview(`url(${result})`);
-      setProfile((currentProfile) => ({ ...currentProfile, banner: `url(${result})` }));
-    });
-  };
-
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        py: { xs: 3, md: 5 },
-        background:
-          "radial-gradient(circle at top left, rgba(96,165,250,0.16) 0%, transparent 26%), linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%)",
-      }}
-    >
-      <Container maxWidth="xl">
-        <Box
-          sx={{
-            minHeight: 280,
-            background: profile.banner || bannerPreview,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            borderRadius: "36px",
-            position: "relative",
-            mb: -12,
-            overflow: "hidden",
-            p: { xs: 2.5, md: 4 },
-            boxShadow: "0 30px 80px rgba(15,23,42,0.18)",
-          }}
-        >
-          <Box sx={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(15,23,42,0.10) 0%, rgba(15,23,42,0.34) 100%)" }} />
-
-          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ position: "relative", zIndex: 1 }}>
-            <Button
-              startIcon={<ArrowBackIcon />}
-              onClick={() => navigate("/")}
-              sx={{
-                color: "#fff",
-                textTransform: "none",
-                fontWeight: 800,
-                bgcolor: "rgba(255, 255, 255, 0.14)",
-                backdropFilter: "blur(8px)",
-                borderRadius: "16px",
-                px: 2.4,
-                py: 1.1,
-                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.22)" },
-              }}
-            >
-              На главную
-            </Button>
-
-            <Tooltip title="Изменить обложку профиля" arrow placement="left">
-              <Button
-                onClick={() => bannerInputRef.current?.click()}
-                startIcon={<PhotoCameraIcon />}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  fontWeight: 700,
-                  bgcolor: "rgba(15, 23, 42, 0.34)",
-                  backdropFilter: "blur(8px)",
-                  borderRadius: "16px",
-                  px: 2.2,
-                  py: 1,
-                  "&:hover": { bgcolor: "rgba(15, 23, 42, 0.48)" },
-                }}
-              >
-                Изменить фон
-              </Button>
-            </Tooltip>
-          </Stack>
-
-          <Box sx={{ position: "relative", zIndex: 1, mt: { xs: 6, md: 10 }, maxWidth: 580 }}>
-            <Typography sx={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.66)", mb: 1 }}>
-              Профиль
-            </Typography>
-            <Typography sx={{ fontWeight: 900, color: "#fff", fontSize: { xs: "2rem", md: "3.2rem" }, letterSpacing: "-0.06em", lineHeight: 0.95, fontFamily: '"Montserrat", sans-serif', mb: 1.3 }}>
-              Управляй
-              <br />
-              своим стилем
-            </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.82)", lineHeight: 1.8, maxWidth: 460 }}>
-              Данные аккаунта, доставка и последние заказы теперь собраны в одном сильном и аккуратном пространстве.
-            </Typography>
-          </Box>
-
-          <input type="file" ref={bannerInputRef} style={{ display: "none" }} accept="image/*" onChange={handleBannerChange} />
+    <Box sx={{ bgcolor: '#f7fbff', minHeight: '100vh' }}>
+      <Container maxWidth='md' sx={{ py: { xs: 3, md: 4 } }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/')}
+            sx={{ color: '#0f449e', textTransform: 'none', fontWeight: 800 }}
+          >
+            Назад
+          </Button>
+          <Typography variant='h5' sx={{ fontWeight: 900, color: '#0f172a' }}>
+            Мой профиль
+          </Typography>
         </Box>
 
-        <Grid container spacing={4} sx={{ position: "relative", zIndex: 2 }}>
-          <Grid item xs={12} md={4}>
+        {/* Main Grid: Profile Card Left, Info Right */}
+        <Grid container spacing={3}>
+          {/* Left: Profile Card */}
+          <Grid item xs={12} sm={4}>
             <Paper
-              elevation={0}
               sx={{
-                p: 4,
-                borderRadius: "32px",
-                textAlign: "center",
-                bgcolor: "rgba(255, 255, 255, 0.92)",
-                backdropFilter: "blur(14px)",
-                border: "1px solid rgba(148,163,184,0.14)",
-                boxShadow: "0 24px 60px rgba(15,23,42,0.08)",
+                p: 3,
+                borderRadius: '20px',
+                bgcolor: '#fff',
+                border: '1px solid rgba(148,163,184,0.12)',
+                boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
               }}
             >
-              <Box onClick={() => avatarInputRef.current?.click()} sx={{ position: "relative", width: 136, height: 136, mx: "auto", mb: 3, cursor: "pointer" }}>
-                <Avatar src={profile.avatar} sx={{ width: "100%", height: "100%", bgcolor: "#0f449e", fontSize: "3.8rem", border: "6px solid #fff", boxShadow: "0 20px 36px rgba(15,23,42,0.16)" }}>
-                  {!profile.avatar && (profile.username ? profile.username.charAt(0) : "U")}
-                </Avatar>
-                <Box sx={{ position: "absolute", inset: 0, borderRadius: "50%", bgcolor: "rgba(15,23,42,0.34)", display: "grid", placeItems: "center", color: "#fff", opacity: 0, transition: "opacity 0.24s ease", "&:hover": { opacity: 1 } }}>
-                  <PhotoCameraIcon sx={{ fontSize: "2rem" }} />
+              {/* Avatar */}
+              <Box sx={{ textAlign: 'center', mb: 3, position: 'relative' }}>
+                <Box
+                  onClick={() => avatarInputRef.current?.click()}
+                  sx={{
+                    position: 'relative',
+                    width: 100,
+                    height: 100,
+                    mx: 'auto',
+                    mb: 2,
+                    cursor: 'pointer',
+                    '&:hover .avatar-overlay': { opacity: 1 },
+                  }}
+                >
+                  <Avatar
+                    src={profile.avatar}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      bgcolor: '#0f449e',
+                      fontSize: '2.5rem',
+                      border: '3px solid #fff',
+                      boxShadow: '0 8px 16px rgba(15,23,42,0.12)',
+                    }}
+                  >
+                    {!profile.avatar && (profile.username ? profile.username.charAt(0) : 'U')}
+                  </Avatar>
+                  <Box
+                    className='avatar-overlay'
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(15,23,42,0.5)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: '#fff',
+                      opacity: 0,
+                      transition: 'opacity 0.2s ease',
+                    }}
+                  >
+                    <PhotoCameraIcon sx={{ fontSize: '1.5rem' }} />
+                  </Box>
                 </Box>
+
+                <input
+                  type='file'
+                  ref={avatarInputRef}
+                  style={{ display: 'none' }}
+                  accept='image/*'
+                  onChange={handleAvatarChange}
+                />
+
+                <Typography
+                  sx={{ fontWeight: 900, color: '#0f172a', fontSize: '1.25rem', mb: 0.3 }}
+                >
+                  {profile.username || 'Без имени'}
+                </Typography>
+                <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                  {profile.email}
+                </Typography>
               </Box>
 
-              <input type="file" ref={avatarInputRef} style={{ display: "none" }} accept="image/*" onChange={handleAvatarChange} />
+              <Divider sx={{ my: 2 }} />
 
-              {!isEditing ? (
-                <>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5, letterSpacing: "-0.03em" }}>
-                    {profile.username || "Без имени"}
+              {/* Stats */}
+              <Stack spacing={1.5} sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ color: '#64748b', fontWeight: 600 }}>Заказов</Typography>
+                  <Typography sx={{ color: '#0f172a', fontWeight: 900 }}>
+                    {orders.length}
                   </Typography>
-                  <Typography sx={{ color: "#0f449e", fontWeight: 700, mb: 2.5 }}>
-                    {profile.email || "Email не указан"}
-                  </Typography>
-                </>
-              ) : (
-                <Box sx={{ mb: 3 }}>
-                  <TextField fullWidth label="Имя" name="username" value={profile.username} onChange={handleChange} size="small" sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: "16px", bgcolor: "#fff" } }} />
-                  <TextField fullWidth label="Email" name="email" value={profile.email} onChange={handleChange} size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "16px", bgcolor: "#fff" } }} />
                 </Box>
-              )}
-
-              <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" useFlexGap sx={{ mb: 3 }}>
-                <Chip label="Premium profile" sx={{ bgcolor: "#eff6ff", color: "#0f449e", fontWeight: 800 }} />
-                <Chip label="Sport member" sx={{ bgcolor: "#f8fafc", color: "#334155", fontWeight: 800 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ color: '#64748b', fontWeight: 600 }}>Доставлено</Typography>
+                  <Typography sx={{ color: '#0f172a', fontWeight: 900 }}>
+                    {deliveredOrdersCount}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ color: '#64748b', fontWeight: 600 }}>Потрачено</Typography>
+                  <Typography sx={{ color: '#0f172a', fontWeight: 900 }}>
+                    {formatCurrency(totalSpent)}
+                  </Typography>
+                </Box>
               </Stack>
 
+              <Divider sx={{ my: 2 }} />
+
+              {/* Role & Completion */}
+              <Stack direction='row' spacing={1} sx={{ mb: 3, flexWrap: 'wrap', gap: 1 }}>
+                <Chip
+                  label={roleLabel}
+                  size='small'
+                  sx={{ bgcolor: '#eff6ff', color: '#0f449e', fontWeight: 700 }}
+                />
+                <Chip
+                  label={`${profileCompletion}% заполнен`}
+                  size='small'
+                  sx={{
+                    bgcolor: profileCompletion === 100 ? '#dcfce7' : '#fff7ed',
+                    color: profileCompletion === 100 ? '#15803d' : '#ea580c',
+                    fontWeight: 700,
+                  }}
+                />
+              </Stack>
+
+              {/* Edit Button */}
               <Button
-                variant="contained"
-                startIcon={isEditing ? <SaveOutlinedIcon /> : <EditOutlinedIcon />}
+                variant='contained'
                 fullWidth
-                sx={{ bgcolor: isEditing ? "#15803d" : "#0f449e", color: "#fff", textTransform: "none", fontWeight: 900, borderRadius: "18px", py: 1.55, fontSize: "1rem", boxShadow: isEditing ? "0 18px 32px rgba(21,128,61,0.22)" : "0 18px 32px rgba(15,68,158,0.22)", "&:hover": { bgcolor: isEditing ? "#166534" : "#0b3376" } }}
+                startIcon={isEditing ? <SaveOutlinedIcon /> : <EditOutlinedIcon />}
                 onClick={() => {
-                  if (isEditing) {
-                    handleSaveProfile();
-                  } else {
-                    setIsEditing(true);
-                  }
+                  if (isEditing) handleSaveProfile();
+                  else setIsEditing(true);
+                }}
+                sx={{
+                  bgcolor: isEditing ? '#15803d' : '#0f449e',
+                  color: '#fff',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  borderRadius: '12px',
+                  py: 1.2,
+                  mb: isEditing ? 1 : 0,
+                  '&:hover': { bgcolor: isEditing ? '#166534' : '#0b3376' },
                 }}
               >
-                {isEditing ? "Сохранить профиль" : "Редактировать профиль"}
+                {isEditing ? 'Сохранить' : 'Редактировать'}
               </Button>
+
+              {isEditing && (
+                <Button
+                  variant='text'
+                  fullWidth
+                  onClick={() => setIsEditing(false)}
+                  sx={{ color: '#64748b', textTransform: 'none', fontWeight: 700, mt: 1 }}
+                >
+                  Отменить
+                </Button>
+              )}
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={8}>
-            <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, borderRadius: "32px", mb: 4, border: "1px solid rgba(148,163,184,0.14)", boxShadow: "0 24px 60px rgba(15,23,42,0.08)", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-                <Avatar sx={{ bgcolor: "#e0f2fe", color: "#0f449e" }}><PersonOutlineIcon /></Avatar>
-                <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-                  Личные данные
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} md={6}>
-                  <Typography sx={{ color: "#94a3b8", fontWeight: 800, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.6 }}>
-                    Телефон
-                  </Typography>
-                  {!isEditing ? (
-                    <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#0f172a" }}>
-                      {profile.phone || "Не указан"}
-                    </Typography>
-                  ) : (
-                    <TextField fullWidth name="phone" value={profile.phone} onChange={handleChange} size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "16px", bgcolor: "#fff" } }} />
-                  )}
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography sx={{ color: "#94a3b8", fontWeight: 800, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.6 }}>
-                    Статус
-                  </Typography>
-                  <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#0f172a" }}>
-                    Активный покупатель
-                  </Typography>
-                </Grid>
-              </Grid>
+          {/* Right: Info & Orders */}
+          <Grid item xs={12} sm={8}>
+            {/* Profile Info */}
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: '20px',
+                bgcolor: '#fff',
+                border: '1px solid rgba(148,163,184,0.12)',
+                boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
+                mb: 3,
+              }}
+            >
+              <Typography variant='h6' sx={{ fontWeight: 900, color: '#0f172a', mb: 2 }}>
+                Информация
+              </Typography>
+              <Divider sx={{ mb: 2.5 }} />
+
+              <Stack spacing={2}>
+                {/* Username & Email */}
+                {!isEditing ? (
+                  <>
+                    <Box>
+                      <Typography
+                        sx={{
+                          color: '#94a3b8',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          mb: 0.5,
+                        }}
+                      >
+                        Имя
+                      </Typography>
+                      <Typography sx={{ color: '#0f172a', fontWeight: 600 }}>
+                        {profile.username || '—'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography
+                        sx={{
+                          color: '#94a3b8',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          mb: 0.5,
+                        }}
+                      >
+                        Email
+                      </Typography>
+                      <Typography
+                        sx={{ color: '#0f172a', fontWeight: 600, wordBreak: 'break-word' }}
+                      >
+                        {profile.email || '—'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography
+                        sx={{
+                          color: '#94a3b8',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          mb: 0.5,
+                        }}
+                      >
+                        Роль
+                      </Typography>
+                      <Typography sx={{ color: '#0f172a', fontWeight: 600 }}>
+                        {roleLabel}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography
+                        sx={{
+                          color: '#94a3b8',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          mb: 0.5,
+                        }}
+                      >
+                        В системе с
+                      </Typography>
+                      <Typography sx={{ color: '#0f172a', fontWeight: 600 }}>
+                        {memberSinceLabel}
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <>
+                    <TextField
+                      label='Имя'
+                      fullWidth
+                      name='username'
+                      value={profile.username}
+                      onChange={handleChange}
+                      size='small'
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                    />
+                    <TextField
+                      label='Email'
+                      fullWidth
+                      name='email'
+                      value={profile.email}
+                      onChange={handleChange}
+                      size='small'
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                    />
+                    <TextField
+                      label='Телефон'
+                      fullWidth
+                      name='phone'
+                      value={profile.phone}
+                      onChange={handleChange}
+                      size='small'
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                    />
+                  </>
+                )}
+              </Stack>
             </Paper>
 
-            <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, borderRadius: "32px", mb: 4, border: "1px solid rgba(148,163,184,0.14)", boxShadow: "0 24px 60px rgba(15,23,42,0.08)", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-                <Avatar sx={{ bgcolor: "#dcfce7", color: "#15803d" }}><LocationOnOutlinedIcon /></Avatar>
-                <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-                  Адрес доставки
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
+            {/* Delivery & Contact */}
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: '20px',
+                bgcolor: '#fff',
+                border: '1px solid rgba(148,163,184,0.12)',
+                boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
+                mb: 3,
+              }}
+            >
+              <Typography variant='h6' sx={{ fontWeight: 900, color: '#0f172a', mb: 2 }}>
+                Доставка
+              </Typography>
+              <Divider sx={{ mb: 2.5 }} />
+
               {!isEditing ? (
-                <Typography sx={{ color: "#334155", bgcolor: "#fff", p: 2.2, borderRadius: "20px", border: "1px solid rgba(148,163,184,0.12)", lineHeight: 1.8 }}>
-                  {profile.address || "Не указан"}
-                </Typography>
-              ) : (
-                <TextField fullWidth name="address" value={profile.address} onChange={handleChange} size="small" multiline rows={3} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "16px", bgcolor: "#fff" } }} />
-              )}
-            </Paper>
-
-            <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, borderRadius: "32px", border: "1px solid rgba(148,163,184,0.14)", boxShadow: "0 24px 60px rgba(15,23,42,0.08)", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-                <Avatar sx={{ bgcolor: "#fff7ed", color: "#ea580c" }}><ShoppingBagOutlinedIcon /></Avatar>
-                <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-                  Последние заказы
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-
-              {recentOrders.length === 0 ? (
-                <Box sx={{ bgcolor: "#fff", border: "1px solid rgba(148,163,184,0.12)", borderRadius: "20px", p: 2.4 }}>
-                  <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.6 }}>
-                    Пока нет оформленных заказов
+                <Box>
+                  <Typography
+                    sx={{
+                      color: '#94a3b8',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      mb: 0.5,
+                    }}
+                  >
+                    Адрес
                   </Typography>
-                  <Typography sx={{ color: "#64748b", lineHeight: 1.7 }}>
-                    Как только оформите покупку, здесь появятся последние заказы и их статусы: в обработке, в пути или доставлен.
+                  <Typography
+                    sx={{
+                      color: '#0f172a',
+                      fontWeight: 500,
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {profile.address || 'Не указан'}
                   </Typography>
                 </Box>
               ) : (
-                <List disablePadding>
+                <TextField
+                  label='Адрес для доставки'
+                  fullWidth
+                  name='address'
+                  value={profile.address}
+                  onChange={handleChange}
+                  multiline
+                  rows={3}
+                  size='small'
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                />
+              )}
+            </Paper>
+
+            {/* Recent Orders */}
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: '20px',
+                bgcolor: '#fff',
+                border: '1px solid rgba(148,163,184,0.12)',
+                boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 2,
+                }}
+              >
+                <Typography variant='h6' sx={{ fontWeight: 900, color: '#0f172a' }}>
+                  Последние заказы
+                </Typography>
+                <Button
+                  size='small'
+                  onClick={() => navigate('/orders')}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  Все
+                </Button>
+              </Box>
+              <Divider sx={{ mb: 2.5 }} />
+
+              {recentOrders.length === 0 ? (
+                <Typography sx={{ color: '#64748b', textAlign: 'center', py: 3 }}>
+                  Здесь появятся ваши заказы
+                </Typography>
+              ) : (
+                <Stack spacing={1.5}>
                   {recentOrders.map((order) => (
-                    <ListItem key={order.id} sx={{ px: 0, py: 2.2, borderBottom: "1px solid rgba(148,163,184,0.12)", "&:last-child": { borderBottom: "none" }, cursor: "pointer" }} onClick={() => navigate("/orders")}>
-                      <ListItemText
-                        disableTypography
-                        primary={<Typography sx={{ fontWeight: 900, color: "#0f172a", fontSize: "1.05rem" }}>Заказ {order.orderNumber}</Typography>}
-                        secondary={<Typography component="span" sx={{ color: "#64748b", mt: 0.4, display: "block" }}>Дата: {new Date(order.createdAt).toLocaleDateString("ru-RU")} | Сумма: {formatCurrency(order.total)}</Typography>}
-                      />
-                      <Tooltip title={`Статус: ${order.label}`} arrow>
-                        <Chip icon={order.icon} label={order.label} color={order.color} size="medium" sx={{ fontWeight: 900, borderRadius: "999px", px: 0.6 }} />
-                      </Tooltip>
-                    </ListItem>
+                    <Box
+                      key={order.id}
+                      onClick={() => navigate('/orders')}
+                      sx={{
+                        p: 2,
+                        borderRadius: '12px',
+                        bgcolor: '#f8fafc',
+                        border: '1px solid rgba(148,163,184,0.12)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: '#eef4fb', borderColor: '#0f449e' },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'start',
+                          gap: 2,
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Typography sx={{ fontWeight: 800, color: '#0f172a', mb: 0.4 }}>
+                            Заказ {order.orderNumber}
+                          </Typography>
+                          <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                            {new Date(order.createdAt).toLocaleDateString('ru-RU')} •{' '}
+                            {formatCurrency(order.total)}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          icon={order.icon}
+                          label={order.label}
+                          color={order.color}
+                          size='small'
+                          sx={{ fontWeight: 700 }}
+                        />
+                      </Box>
+                    </Box>
                   ))}
-                </List>
+                </Stack>
               )}
             </Paper>
           </Grid>

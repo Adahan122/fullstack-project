@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -60,6 +61,7 @@ const adminSections = [
 const emptyProductForm = {
   name: "",
   category: "",
+  subcategory: "",
   brand: "",
   gender: "",
   price: "",
@@ -75,6 +77,22 @@ const emptyProductForm = {
   is_featured: false,
   is_new: false,
 };
+
+const catalogCategoryOptions = ["Shoes", "Clothes", "Bags", "Accessories"];
+const audienceOptions = ["Men", "Women", "Kids", "Unisex"];
+const subcategoryOptions = [
+  "Ботинки",
+  "Кроссовки",
+  "Кеды",
+  "Футболки",
+  "Худи",
+  "Куртки",
+  "Штаны",
+  "Шорты",
+  "Рюкзаки",
+  "Сумки",
+  "Аксессуары",
+];
 
 const orderStatusOptions = [
   { value: "processing", label: "В обработке", color: "info" },
@@ -101,7 +119,8 @@ function getStockMeta(stockValue) {
 }
 
 function AdminPage() {
-  const { token, user } = useApp();
+  const navigate = useNavigate();
+  const { logout, token, user } = useApp();
   const [activeSection, setActiveSection] = useState("overview");
   const [overview, setOverview] = useState(null);
   const [products, setProducts] = useState([]);
@@ -119,6 +138,27 @@ function AdminPage() {
   const [reportSearch, setReportSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [productStockFilter, setProductStockFilter] = useState("all");
+
+  const handleAdminRequestError = useCallback((requestError, fallbackMessage) => {
+    const errorMessage = requestError?.message || fallbackMessage;
+    const isInvalidTokenError =
+      requestError?.status === 401 ||
+      /(token|токен)/i.test(String(errorMessage));
+
+    if (isInvalidTokenError) {
+      logout();
+      navigate("/login", {
+        replace: true,
+        state: {
+          authError: "Сессия администратора истекла или токен недействителен. Войдите заново.",
+        },
+      });
+      return true;
+    }
+
+    setError(errorMessage);
+    return false;
+  }, [logout, navigate]);
 
   const stats = useMemo(
     () => [
@@ -162,7 +202,7 @@ function AdminPage() {
     const searchedProducts = !query
       ? products
       : products.filter((product) =>
-      [product.name, product.brand, product.category]
+      [product.name, product.brand, product.category, product.subcategory, product.gender]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)),
     );
@@ -237,10 +277,10 @@ function AdminPage() {
 
     loadAdminData()
       .catch((requestError) => {
-        setError(requestError.message || "Не удалось загрузить админку");
+        handleAdminRequestError(requestError, "Не удалось загрузить админку");
       })
       .finally(() => setLoading(false));
-  }, [loadAdminData, token]);
+  }, [handleAdminRequestError, loadAdminData, token]);
 
   const refreshAdminData = async () => {
     setIsRefreshing(true);
@@ -249,7 +289,7 @@ function AdminPage() {
     try {
       await loadAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось обновить данные админки");
+      handleAdminRequestError(requestError, "Не удалось обновить данные админки");
     } finally {
       setIsRefreshing(false);
     }
@@ -266,6 +306,7 @@ function AdminPage() {
     setProductForm({
       name: product.name || "",
       category: product.category || "",
+      subcategory: product.subcategory || "",
       brand: product.brand || "",
       gender: product.gender || "",
       price: product.price ?? "",
@@ -312,7 +353,7 @@ function AdminPage() {
       setIsDialogOpen(false);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось сохранить товар");
+      handleAdminRequestError(requestError, "Не удалось сохранить товар");
     } finally {
       setIsSavingProduct(false);
     }
@@ -323,7 +364,7 @@ function AdminPage() {
       await adminDeleteProduct(token, productId);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось удалить товар");
+      handleAdminRequestError(requestError, "Не удалось удалить товар");
     }
   };
 
@@ -332,7 +373,7 @@ function AdminPage() {
       await adminUpdateOrderStatus(token, orderId, status);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось обновить статус заказа");
+      handleAdminRequestError(requestError, "Не удалось обновить статус заказа");
     }
   };
 
@@ -341,7 +382,7 @@ function AdminPage() {
       await adminUpdateReviewReportStatus(token, reportId, status);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось обновить статус жалобы");
+      handleAdminRequestError(requestError, "Не удалось обновить статус жалобы");
     }
   };
 
@@ -350,7 +391,7 @@ function AdminPage() {
       await adminDeleteReview(token, reviewId);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось удалить отзыв");
+      handleAdminRequestError(requestError, "Не удалось удалить отзыв");
     }
   };
 
@@ -365,7 +406,7 @@ function AdminPage() {
       });
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось обновить пользователя");
+      handleAdminRequestError(requestError, "Не удалось обновить пользователя");
     }
   };
 
@@ -374,7 +415,7 @@ function AdminPage() {
       await adminDeleteUser(token, userId);
       await refreshAdminData();
     } catch (requestError) {
-      setError(requestError.message || "Не удалось удалить пользователя");
+      handleAdminRequestError(requestError, "Не удалось удалить пользователя");
     }
   };
 
@@ -590,7 +631,7 @@ function AdminPage() {
                                       {product.name}
                                     </Typography>
                                     <Typography sx={{ color: "#64748b", fontSize: "14px", mb: 0.6 }}>
-                                      {product.brand || "Без бренда"} · {product.category || "Без категории"} · остаток {product.stock}
+                                      {product.brand || "Без бренда"} · {product.gender || "Без раздела"} · {product.category || "Без категории"}{product.subcategory ? ` · ${product.subcategory}` : ""} · остаток {product.stock}
                                     </Typography>
                                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                       <Chip label={formatCurrency(product.price)} sx={{ fontWeight: 800, borderRadius: "999px" }} />
@@ -796,10 +837,40 @@ function AdminPage() {
               <TextField label="Бренд" name="brand" value={productForm.brand} onChange={handleProductFieldChange} fullWidth />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Категория" name="category" value={productForm.category} onChange={handleProductFieldChange} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel>Категория</InputLabel>
+                <Select label="Категория" name="category" value={productForm.category} onChange={handleProductFieldChange}>
+                  {catalogCategoryOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Пол" name="gender" value={productForm.gender} onChange={handleProductFieldChange} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel>Раздел</InputLabel>
+                <Select label="Раздел" name="gender" value={productForm.gender} onChange={handleProductFieldChange}>
+                  {audienceOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option === "Men" ? "Мужчинам" : option === "Women" ? "Женщинам" : option === "Kids" ? "Детям" : "Унисекс"}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Подкатегория</InputLabel>
+                <Select label="Подкатегория" name="subcategory" value={productForm.subcategory} onChange={handleProductFieldChange}>
+                  {subcategoryOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField label="Тег" name="tag" value={productForm.tag} onChange={handleProductFieldChange} fullWidth />

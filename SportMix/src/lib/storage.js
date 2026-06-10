@@ -4,6 +4,7 @@ export const storageKeys = {
   cart: `${storagePrefix}:cart`,
   favorites: `${storagePrefix}:favorites`,
   orders: `${storagePrefix}:orders`,
+  recentlyViewed: `${storagePrefix}:recently-viewed`,
   token: `${storagePrefix}:token`,
   user: `${storagePrefix}:user`,
   authPromptSeen: `${storagePrefix}:auth-prompt-seen`,

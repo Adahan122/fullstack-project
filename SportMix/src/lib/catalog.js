@@ -24,8 +24,30 @@ export function getBrandOptions(products) {
   );
 }
 
+export function getGenderOptions(products) {
+  const baseOptions = ["Men", "Women", "Kids", "Unisex"];
+  const dynamicOptions = Array.from(new Set(products.map((item) => item.gender).filter(Boolean)));
+  return Array.from(new Set([...baseOptions, ...dynamicOptions])).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+export function getSizeOptions(products) {
+  return Array.from(
+    new Set(
+      products.flatMap((item) => (Array.isArray(item.sizes) ? item.sizes : [])).filter(Boolean),
+    ),
+  ).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+}
+
 export function filterProducts(products, filters) {
-  const { category, priceRange, selectedBrands, searchQuery } = filters;
+  const {
+    category,
+    selectedBrands,
+    selectedGenders,
+    selectedSizes,
+    searchQuery,
+  } = filters;
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   return products.filter((item) => {
@@ -33,7 +55,9 @@ export function filterProducts(products, filters) {
     const itemOldPrice = normalizePrice(item.oldPrice || item.old_price);
     const matchesSearch =
       !normalizedQuery ||
-      [item.name, item.brand].some((value) => value?.toLowerCase().includes(normalizedQuery));
+      [item.name, item.brand, item.category, item.subcategory, item.gender].some((value) =>
+        value?.toLowerCase().includes(normalizedQuery),
+      );
 
     const matchesCategory =
       category === "all" ||
@@ -41,12 +65,20 @@ export function filterProducts(products, filters) {
       (category === "Sale" && (Boolean(item.is_sale) || itemOldPrice > itemPrice)) ||
       (category !== "New" && category !== "Sale" && item.category === category);
 
-    const matchesPrice = itemPrice >= priceRange[0] && itemPrice <= priceRange[1];
     const matchesBrand =
       selectedBrands.length === 0 ||
       selectedBrands.some((brand) => brand.toLowerCase() === item.brand?.toLowerCase());
+    const matchesGender =
+      selectedGenders.length === 0 ||
+      selectedGenders.some((gender) => gender.toLowerCase() === item.gender?.toLowerCase());
+    const itemSizes = Array.isArray(item.sizes) ? item.sizes : [];
+    const matchesSize =
+      selectedSizes.length === 0 ||
+      selectedSizes.some((size) =>
+        itemSizes.some((itemSize) => String(itemSize).toLowerCase() === String(size).toLowerCase()),
+      );
 
-    return matchesSearch && matchesCategory && matchesPrice && matchesBrand;
+    return matchesSearch && matchesCategory && matchesBrand && matchesGender && matchesSize;
   });
 }
 

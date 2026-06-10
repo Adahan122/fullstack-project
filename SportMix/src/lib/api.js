@@ -1,9 +1,7 @@
-import { readJson, storageKeys, writeJson } from "./storage";
+import { readJson, storageKeys, writeJson } from './storage';
 
-const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim() || "/api";
-const API_BASE_URL = rawApiBaseUrl.endsWith("/")
-  ? rawApiBaseUrl.slice(0, -1)
-  : rawApiBaseUrl;
+const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim() || '/api';
+const API_BASE_URL = rawApiBaseUrl.endsWith('/') ? rawApiBaseUrl.slice(0, -1) : rawApiBaseUrl;
 
 async function request(path, options = {}) {
   let response;
@@ -11,7 +9,7 @@ async function request(path, options = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, options);
   } catch {
-    const networkError = new Error("Сервер сейчас недоступен.");
+    const networkError = new Error('Сервер сейчас недоступен.');
     networkError.status = 0;
     throw networkError;
   }
@@ -21,13 +19,13 @@ async function request(path, options = {}) {
   try {
     payload = await response.json();
   } catch {
-    const parseError = new Error("Сервер вернул некорректный ответ.");
+    const parseError = new Error('Сервер вернул некорректный ответ.');
     parseError.status = response.status;
     throw parseError;
   }
 
   if (!response.ok) {
-    const requestError = new Error(payload?.error || "Ошибка запроса.");
+    const requestError = new Error(payload?.error || 'Ошибка запроса.');
     requestError.status = response.status;
     throw requestError;
   }
@@ -71,14 +69,28 @@ function createLocalOrder(payload) {
       }))
     : [];
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryFee = Number(payload?.deliveryFee || 0);
+  const discountAmount = Number(payload?.discountAmount || 0);
+  const total = Math.max(subtotal + deliveryFee - discountAmount, 0);
   const localOrder = {
     id: `local-${Date.now()}`,
     orderNumber: `SM-${String(Date.now()).slice(-8)}`,
-    status: "processing",
+    status: 'processing',
+    subtotal,
+    deliveryFee,
+    discountAmount,
     total,
-    shippingAddress: payload?.shippingAddress || "",
-    paymentMethod: payload?.paymentMethod || "card",
+    shippingAddress: payload?.shippingAddress || '',
+    paymentMethod: payload?.paymentMethod || 'card',
+    paymentStatus:
+      payload?.paymentStatus || (payload?.paymentMethod === 'cash' ? 'pending' : 'paid'),
+    paymentReference: payload?.paymentReference || '',
+    paymentProvider: payload?.paymentProvider || '',
+    paymentCardLast4: payload?.paymentCardLast4 || '',
+    deliveryMethod: payload?.deliveryMethod || 'courier',
+    customerNote: payload?.customerNote || '',
+    promoCode: payload?.promoCode || '',
     createdAt: new Date().toISOString(),
     items,
     isLocalSimulation: true,
@@ -89,35 +101,45 @@ function createLocalOrder(payload) {
 }
 
 export function fetchProducts() {
-  return request("/data");
+  return request('/data');
+}
+
+// Server-side search with pagination
+export function searchProducts(query, limit = 20, offset = 0) {
+  const params = new URLSearchParams();
+  if (query) params.append('q', query);
+  params.append('limit', limit);
+  params.append('offset', offset);
+
+  return request(`/search?${params.toString()}`);
 }
 
 export function loginUser(credentials) {
-  return request("/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  return request('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
   });
 }
 
 export function registerUser(payload) {
-  return request("/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  return request('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 }
 
 export function fetchProfile(token) {
-  return request("/profile", withAuth(token));
+  return request('/profile', withAuth(token));
 }
 
 export function updateProfile(token, profile) {
   return request(
-    "/profile",
+    '/profile',
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(profile),
     }),
   );
@@ -125,10 +147,10 @@ export function updateProfile(token, profile) {
 
 export function createOrder(token, payload) {
   return request(
-    "/orders",
+    '/orders',
     withAuth(token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   ).catch((error) => {
@@ -141,7 +163,7 @@ export function createOrder(token, payload) {
 }
 
 export function fetchOrders(token) {
-  return request("/orders", withAuth(token)).catch((error) => {
+  return request('/orders', withAuth(token)).catch((error) => {
     if (shouldUseLocalOrdersFallback(error)) {
       return readLocalOrders();
     }
@@ -150,18 +172,18 @@ export function fetchOrders(token) {
   });
 }
 
-export function fetchProductReviews(productId, token = "", params = {}) {
+export function fetchProductReviews(productId, token = '', params = {}) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
+    if (value !== undefined && value !== null && value !== '') {
       searchParams.set(key, String(value));
     }
   });
 
   const queryString = searchParams.toString();
   return request(
-    `/products/${productId}/reviews${queryString ? `?${queryString}` : ""}`,
+    `/products/${productId}/reviews${queryString ? `?${queryString}` : ''}`,
     token ? withAuth(token) : undefined,
   );
 }
@@ -170,8 +192,8 @@ export function createProductReview(token, productId, payload) {
   return request(
     `/products/${productId}/reviews`,
     withAuth(token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
@@ -181,8 +203,8 @@ export function updateProductReview(token, productId, reviewId, payload) {
   return request(
     `/products/${productId}/reviews/${reviewId}`,
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
@@ -192,7 +214,7 @@ export function deleteProductReview(token, productId, reviewId) {
   return request(
     `/products/${productId}/reviews/${reviewId}`,
     withAuth(token, {
-      method: "DELETE",
+      method: 'DELETE',
     }),
   );
 }
@@ -201,7 +223,7 @@ export function toggleProductReviewLike(token, productId, reviewId) {
   return request(
     `/products/${productId}/reviews/${reviewId}/like`,
     withAuth(token, {
-      method: "POST",
+      method: 'POST',
     }),
   );
 }
@@ -210,27 +232,27 @@ export function reportProductReview(token, productId, reviewId, payload) {
   return request(
     `/products/${productId}/reviews/${reviewId}/report`,
     withAuth(token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
 }
 
 export function adminFetchOverview(token) {
-  return request("/admin/overview", withAuth(token));
+  return request('/admin/overview', withAuth(token));
 }
 
 export function adminFetchUsers(token) {
-  return request("/admin/users", withAuth(token));
+  return request('/admin/users', withAuth(token));
 }
 
 export function adminUpdateUser(token, userId, payload) {
   return request(
     `/admin/users/${userId}`,
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
@@ -240,21 +262,21 @@ export function adminDeleteUser(token, userId) {
   return request(
     `/admin/users/${userId}`,
     withAuth(token, {
-      method: "DELETE",
+      method: 'DELETE',
     }),
   );
 }
 
 export function adminFetchProducts(token) {
-  return request("/admin/products", withAuth(token));
+  return request('/admin/products', withAuth(token));
 }
 
 export function adminCreateProduct(token, payload) {
   return request(
-    "/admin/products",
+    '/admin/products',
     withAuth(token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
@@ -264,8 +286,8 @@ export function adminUpdateProduct(token, productId, payload) {
   return request(
     `/admin/products/${productId}`,
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   );
@@ -275,36 +297,36 @@ export function adminDeleteProduct(token, productId) {
   return request(
     `/admin/products/${productId}`,
     withAuth(token, {
-      method: "DELETE",
+      method: 'DELETE',
     }),
   );
 }
 
 export function adminFetchOrders(token) {
-  return request("/admin/orders", withAuth(token));
+  return request('/admin/orders', withAuth(token));
 }
 
 export function adminUpdateOrderStatus(token, orderId, status) {
   return request(
     `/admin/orders/${orderId}/status`,
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     }),
   );
 }
 
 export function adminFetchReviewReports(token) {
-  return request("/admin/review-reports", withAuth(token));
+  return request('/admin/review-reports', withAuth(token));
 }
 
 export function adminUpdateReviewReportStatus(token, reportId, status) {
   return request(
     `/admin/review-reports/${reportId}`,
     withAuth(token, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     }),
   );
@@ -314,7 +336,7 @@ export function adminDeleteReview(token, reviewId) {
   return request(
     `/admin/reviews/${reviewId}`,
     withAuth(token, {
-      method: "DELETE",
+      method: 'DELETE',
     }),
   );
 }

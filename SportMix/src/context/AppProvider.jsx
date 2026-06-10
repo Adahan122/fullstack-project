@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Alert, Snackbar } from "@mui/material";
 
 import { AppContext } from "./app-context";
 import {
@@ -21,6 +22,11 @@ function getInitialFavorites() {
   return Array.isArray(favorites) ? favorites : [];
 }
 
+function getInitialRecentlyViewed() {
+  const products = readJson(storageKeys.recentlyViewed, []);
+  return Array.isArray(products) ? products : [];
+}
+
 function getInitialUser() {
   return readJson(storageKeys.user, null);
 }
@@ -32,6 +38,7 @@ function getInitialToken() {
 export function AppProvider({ children }) {
   const [cart, setCart] = useState(getInitialCart);
   const [favorites, setFavorites] = useState(getInitialFavorites);
+  const [recentlyViewed, setRecentlyViewed] = useState(getInitialRecentlyViewed);
   const [user, setUser] = useState(getInitialUser);
   const [token, setToken] = useState(getInitialToken);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -39,6 +46,11 @@ export function AppProvider({ children }) {
     readString(storageKeys.authPromptSeen, "") === "true",
   );
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [toast, setToast] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   useEffect(() => {
     writeJson(storageKeys.cart, cart);
@@ -47,6 +59,10 @@ export function AppProvider({ children }) {
   useEffect(() => {
     writeJson(storageKeys.favorites, favorites);
   }, [favorites]);
+
+  useEffect(() => {
+    writeJson(storageKeys.recentlyViewed, recentlyViewed);
+  }, [recentlyViewed]);
 
   useEffect(() => {
     if (user) {
@@ -72,6 +88,22 @@ export function AppProvider({ children }) {
   const markAuthPromptSeen = () => {
     writeString(storageKeys.authPromptSeen, "true");
     setHasSeenAuthPrompt(true);
+  };
+
+  const showToast = (message, severity = "success") => {
+    setToast({
+      open: true,
+      message,
+      severity,
+    });
+  };
+
+  const closeToast = (_, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setToast((currentToast) => ({ ...currentToast, open: false }));
   };
 
   const completeAuth = (authPayload) => {
@@ -143,6 +175,47 @@ export function AppProvider({ children }) {
     );
   };
 
+  const updateCartQuantity = (productId, size = null, nextQuantity) => {
+    let result = { success: true };
+
+    setCart((currentCart) => {
+      const matchedItem = currentCart.find(
+        (item) => item.id === productId && item.selectedSize === size,
+      );
+
+      if (!matchedItem) {
+        result = { success: false, error: "Товар в корзине не найден" };
+        return currentCart;
+      }
+
+      const safeQuantity = Number(nextQuantity);
+
+      if (!Number.isFinite(safeQuantity) || safeQuantity < 1) {
+        return currentCart.filter(
+          (item) => !(item.id === productId && item.selectedSize === size),
+        );
+      }
+
+      const availableStock = Number(matchedItem.stock || 0);
+
+      if (availableStock > 0 && safeQuantity > availableStock) {
+        result = {
+          success: false,
+          error: `Доступно только ${availableStock} шт.`,
+        };
+        return currentCart;
+      }
+
+      return currentCart.map((item) =>
+        item.id === productId && item.selectedSize === size
+          ? { ...item, quantity: safeQuantity }
+          : item,
+      );
+    });
+
+    return result;
+  };
+
   const toggleFavorite = (productId) => {
     if (!user) {
       return { changed: false, isFavorite: false, requiresAuth: true };
@@ -159,7 +232,46 @@ export function AppProvider({ children }) {
     return { changed: true, isFavorite: nextFavoriteState, requiresAuth: false };
   };
 
-  const placeOrder = async ({ shippingAddress, paymentMethod = "card" } = {}) => {
+  const markProductViewed = (product) => {
+    if (!product?.id) {
+      return;
+    }
+
+    setRecentlyViewed((currentProducts) => {
+      const nextProduct = {
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        category: product.category,
+        gender: product.gender,
+        price: product.price,
+        oldPrice: product.oldPrice || product.old_price || null,
+        rating: product.rating,
+        reviews: product.reviews,
+        image: product.image,
+        stock: product.stock,
+        sizes: Array.isArray(product.sizes) ? product.sizes : [],
+        viewedAt: new Date().toISOString(),
+      };
+
+      const filtered = currentProducts.filter((item) => item.id !== product.id);
+      return [nextProduct, ...filtered].slice(0, 12);
+    });
+  };
+
+  const placeOrder = async ({
+    shippingAddress,
+    paymentMethod = "card",
+    deliveryMethod = "courier",
+    deliveryFee = 0,
+    customerNote = "",
+    promoCode = "",
+    discountAmount = 0,
+    paymentStatus = "pending",
+    paymentReference = "",
+    paymentProvider = "",
+    paymentCardLast4 = "",
+  } = {}) => {
     if (!user || !token) {
       requireAuth();
       return { success: false, requiresAuth: true };
@@ -176,6 +288,15 @@ export function AppProvider({ children }) {
         items: cart,
         shippingAddress: shippingAddress || user.address || "",
         paymentMethod,
+        deliveryMethod,
+        deliveryFee,
+        customerNote,
+        promoCode,
+        discountAmount,
+        paymentStatus,
+        paymentReference,
+        paymentProvider,
+        paymentCardLast4,
       });
 
       setCart([]);
@@ -190,8 +311,10 @@ export function AppProvider({ children }) {
   const value = {
     cart,
     cartItemsCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+    cartSubtotal: cart.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0),
     cartTotal: cart.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0),
     favorites,
+    recentlyViewed,
     isFavorite: (productId) => favorites.includes(productId),
     user,
     token,
@@ -201,16 +324,33 @@ export function AppProvider({ children }) {
     setIsAuthModalOpen,
     hasSeenAuthPrompt,
     isPlacingOrder,
+    showToast,
     markAuthPromptSeen,
     requireAuth,
     completeAuth,
     setUser,
     addToCart,
     removeFromCart,
+    updateCartQuantity,
     toggleFavorite,
+    markProductViewed,
     placeOrder,
     logout,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={2600}
+        onClose={closeToast}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={closeToast} severity={toast.severity} sx={{ width: "100%", borderRadius: "14px" }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
+    </AppContext.Provider>
+  );
 }

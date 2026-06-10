@@ -1,12 +1,13 @@
-import { Box, Button, Container, Typography } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { useNavigate } from "react-router-dom";
+import { Box, Button, Container, Typography } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useNavigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 
-import Footer from "./Footer";
-import Header from "./Header";
-import ProductGrid from "./ProductGrid";
-import { useApp } from "../context/app-context";
-import { useProducts } from "../hooks/useProducts";
+const Footer = lazy(() => import('./Footer'));
+import Header from './Header';
+import ProductGrid from './ProductGrid';
+import { useApp } from '../context/app-context';
+import { useProducts } from '../hooks/useProducts';
 
 function FavoritesPage() {
   const navigate = useNavigate();
@@ -16,33 +17,41 @@ function FavoritesPage() {
   const favoriteProducts = products.filter((item) => favorites.includes(item.id));
 
   return (
-    <Box sx={{ bgcolor: "#fff", minHeight: "100vh", width: "100%", overflowX: "hidden" }}>
+    <Box sx={{ bgcolor: '#fff', minHeight: '100vh', width: '100%', overflowX: 'hidden' }}>
       <Header />
 
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+      <Container maxWidth='xl' sx={{ mt: { xs: 2.5, md: 4 }, mb: { xs: 6, md: 8 } }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/")}
-          sx={{ color: "#000", mb: 3, textTransform: "none", fontWeight: 600 }}
+          onClick={() => navigate('/')}
+          sx={{ color: '#000', mb: 3, textTransform: 'none', fontWeight: 600 }}
         >
           Вернуться в магазин
         </Button>
 
-        <Typography variant="h4" sx={{ fontWeight: 800, color: "#1a1a1a", mb: 4 }}>
+        <Typography
+          variant='h4'
+          sx={{
+            fontWeight: 800,
+            color: '#1a1a1a',
+            mb: 4,
+            fontSize: { xs: '1.9rem', md: '2.125rem' },
+          }}
+        >
           Избранное
         </Typography>
 
         {favoriteProducts.length > 0 ? (
           <ProductGrid products={favoriteProducts} />
         ) : (
-          <Box sx={{ textAlign: "center", py: 10 }}>
-            <Typography variant="h5" sx={{ color: "#888", mb: 2 }}>
+          <Box sx={{ textAlign: 'center', py: 10 }}>
+            <Typography variant='h5' sx={{ color: '#888', mb: 2 }}>
               В избранном пока ничего нет
             </Typography>
             <Button
-              variant="contained"
-              onClick={() => navigate("/")}
-              sx={{ bgcolor: "#0f449e", textTransform: "none", fontWeight: 600 }}
+              variant='contained'
+              onClick={() => navigate('/')}
+              sx={{ bgcolor: '#0f449e', textTransform: 'none', fontWeight: 600 }}
             >
               Перейти к покупкам
             </Button>
@@ -50,7 +59,9 @@ function FavoritesPage() {
         )}
       </Container>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </Box>
   );
 }

@@ -2,18 +2,51 @@ import { useEffect, useState } from "react";
 
 import { fetchProducts } from "../lib/api";
 
+let productsCache = null;
+let productsCacheError = null;
+let productsRequest = null;
+
+function loadProducts() {
+  if (productsCache) {
+    return Promise.resolve(productsCache);
+  }
+
+  if (productsCacheError) {
+    return Promise.reject(productsCacheError);
+  }
+
+  if (!productsRequest) {
+    productsRequest = fetchProducts()
+      .then((items) => {
+        productsCache = Array.isArray(items) ? items : [];
+        productsCacheError = null;
+        return productsCache;
+      })
+      .catch((requestError) => {
+        productsCacheError = requestError;
+        throw requestError;
+      })
+      .finally(() => {
+        productsRequest = null;
+      });
+  }
+
+  return productsRequest;
+}
+
 export function useProducts() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [products, setProducts] = useState(() => productsCache || []);
+  const [loading, setLoading] = useState(() => !productsCache && !productsCacheError);
+  const [error, setError] = useState(() => productsCacheError);
 
   useEffect(() => {
     let isMounted = true;
 
-    fetchProducts()
+    loadProducts()
       .then((items) => {
         if (isMounted) {
-          setProducts(Array.isArray(items) ? items : []);
+          setProducts(items);
+          setError(null);
         }
       })
       .catch((requestError) => {

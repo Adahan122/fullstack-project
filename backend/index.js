@@ -1,200 +1,212 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const { Pool } = require("pg");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env'), override: false });
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_123";
-const isProduction = process.env.NODE_ENV === "production";
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@sportmix.dev").trim().toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SportMixAdmin123!";
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "SportMix Admin";
-const corsOriginEnv = process.env.CORS_ORIGIN || "";
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_123';
+const isProduction = process.env.NODE_ENV === 'production';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@sportmix.dev').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'SportMixAdmin123!';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'SportMix Admin';
+const corsOriginEnv = process.env.CORS_ORIGIN || '';
 const allowedOrigins = corsOriginEnv
-  .split(",")
+  .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 const starterProducts = [
   {
-    name: "Nike Air Zoom Pegasus 41",
-    category: "Shoes",
-    brand: "Nike",
-    gender: "Unisex",
+    name: 'Nike Air Zoom Pegasus 41',
+    category: 'Shoes',
+    brand: 'Nike',
+    gender: 'Unisex',
     price: 12990,
     oldPrice: 14990,
     rating: 4.8,
     reviews: 124,
-    tag: "Top",
+    tag: 'Top',
     stock: 14,
-    sizes: ["40", "41", "42", "43", "44"],
-    colors: ["Black", "White", "Volt"],
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-    description: "Легкие беговые кроссовки для ежедневных тренировок и городского ритма.",
+    sizes: ['40', '41', '42', '43', '44'],
+    colors: ['Black', 'White', 'Volt'],
+    image:
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80',
+    description: 'Легкие беговые кроссовки для ежедневных тренировок и городского ритма.',
     is_featured: true,
     is_new: true,
   },
   {
-    name: "Adidas Ultraboost Light",
-    category: "Shoes",
-    brand: "Adidas",
-    gender: "Unisex",
+    name: 'Adidas Ultraboost Light',
+    category: 'Shoes',
+    brand: 'Adidas',
+    gender: 'Unisex',
     price: 13990,
     oldPrice: 16990,
     rating: 4.7,
     reviews: 96,
-    tag: "Sale",
+    tag: 'Sale',
     stock: 10,
-    sizes: ["39", "40", "41", "42", "43"],
-    colors: ["White", "Gray"],
-    image: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=900&q=80",
-    description: "Амортизирующие кроссовки с мягкой посадкой для длинных дистанций.",
+    sizes: ['39', '40', '41', '42', '43'],
+    colors: ['White', 'Gray'],
+    image:
+      'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=900&q=80',
+    description: 'Амортизирующие кроссовки с мягкой посадкой для длинных дистанций.',
     is_featured: true,
     is_new: false,
   },
   {
-    name: "Puma Teamgoal Hoodie",
-    category: "Clothes",
-    brand: "Puma",
-    gender: "Men",
+    name: 'Puma Teamgoal Hoodie',
+    category: 'Clothes',
+    brand: 'Puma',
+    gender: 'Men',
     price: 5990,
     oldPrice: 7490,
     rating: 4.6,
     reviews: 41,
-    tag: "Sale",
+    tag: 'Sale',
     stock: 20,
-    sizes: ["S", "M", "L", "XL"],
-    colors: ["Black", "Navy"],
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
-    description: "Теплое худи для тренировок, прогулок и повседневного спортивного образа.",
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Black', 'Navy'],
+    image:
+      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80',
+    description: 'Теплое худи для тренировок, прогулок и повседневного спортивного образа.',
     is_featured: false,
     is_new: false,
   },
   {
-    name: "Under Armour HeatGear Tee",
-    category: "Clothes",
-    brand: "Under Armour",
-    gender: "Men",
+    name: 'Under Armour HeatGear Tee',
+    category: 'Clothes',
+    brand: 'Under Armour',
+    gender: 'Men',
     price: 3490,
     oldPrice: null,
     rating: 4.5,
     reviews: 58,
-    tag: "New",
+    tag: 'New',
     stock: 18,
-    sizes: ["S", "M", "L", "XL"],
-    colors: ["White", "Blue"],
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80",
-    description: "Дышащая футболка для зала и активного дня с быстрым отводом влаги.",
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['White', 'Blue'],
+    image:
+      'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
+    description: 'Дышащая футболка для зала и активного дня с быстрым отводом влаги.',
     is_featured: true,
     is_new: true,
   },
   {
-    name: "Reebok Training Shorts",
-    category: "Clothes",
-    brand: "Reebok",
-    gender: "Women",
+    name: 'Reebok Training Shorts',
+    category: 'Clothes',
+    brand: 'Reebok',
+    gender: 'Women',
     price: 2890,
     oldPrice: 3590,
     rating: 4.4,
     reviews: 33,
-    tag: "Fit",
+    tag: 'Fit',
     stock: 22,
-    sizes: ["XS", "S", "M", "L"],
-    colors: ["Pink", "Black"],
-    image: "https://images.unsplash.com/photo-1506629905607-d9c297d6f61f?auto=format&fit=crop&w=900&q=80",
-    description: "Эластичные шорты для фитнеса, бега и летних тренировок.",
+    sizes: ['XS', 'S', 'M', 'L'],
+    colors: ['Pink', 'Black'],
+    image:
+      'https://images.unsplash.com/photo-1506629905607-d9c297d6f61f?auto=format&fit=crop&w=900&q=80',
+    description: 'Эластичные шорты для фитнеса, бега и летних тренировок.',
     is_featured: false,
     is_new: true,
   },
   {
-    name: "Asics Gel-Kayano 31",
-    category: "Shoes",
-    brand: "Asics",
-    gender: "Unisex",
+    name: 'Asics Gel-Kayano 31',
+    category: 'Shoes',
+    brand: 'Asics',
+    gender: 'Unisex',
     price: 15990,
     oldPrice: 17990,
     rating: 4.9,
     reviews: 72,
-    tag: "Pro",
+    tag: 'Pro',
     stock: 9,
-    sizes: ["40", "41", "42", "43", "44", "45"],
-    colors: ["Blue", "Orange"],
-    image: "https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&w=900&q=80",
-    description: "Стабильные премиальные кроссовки для бега с усиленной поддержкой стопы.",
+    sizes: ['40', '41', '42', '43', '44', '45'],
+    colors: ['Blue', 'Orange'],
+    image:
+      'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&w=900&q=80',
+    description: 'Стабильные премиальные кроссовки для бега с усиленной поддержкой стопы.',
     is_featured: true,
     is_new: true,
   },
   {
-    name: "Nike Brasilia Duffel Bag",
-    category: "Bags",
-    brand: "Nike",
-    gender: "Unisex",
+    name: 'Nike Brasilia Duffel Bag',
+    category: 'Bags',
+    brand: 'Nike',
+    gender: 'Unisex',
     price: 4290,
     oldPrice: null,
     rating: 4.7,
     reviews: 51,
-    tag: "Gym",
+    tag: 'Gym',
     stock: 16,
-    sizes: ["One Size"],
-    colors: ["Black"],
-    image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=80",
-    description: "Вместительная спортивная сумка для формы, обуви и ежедневных тренировок.",
+    sizes: ['One Size'],
+    colors: ['Black'],
+    image:
+      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=80',
+    description: 'Вместительная спортивная сумка для формы, обуви и ежедневных тренировок.',
     is_featured: true,
     is_new: false,
   },
   {
-    name: "Adidas Classic Backpack",
-    category: "Bags",
-    brand: "Adidas",
-    gender: "Unisex",
+    name: 'Adidas Classic Backpack',
+    category: 'Bags',
+    brand: 'Adidas',
+    gender: 'Unisex',
     price: 3790,
     oldPrice: 4590,
     rating: 4.5,
     reviews: 38,
-    tag: "City",
+    tag: 'City',
     stock: 19,
-    sizes: ["One Size"],
-    colors: ["Black", "Green"],
-    image: "https://images.unsplash.com/photo-1581605405669-fcdf81165afa?auto=format&fit=crop&w=900&q=80",
-    description: "Городской рюкзак в спортивном стиле для учебы, работы и поездок.",
+    sizes: ['One Size'],
+    colors: ['Black', 'Green'],
+    image:
+      'https://images.unsplash.com/photo-1581605405669-fcdf81165afa?auto=format&fit=crop&w=900&q=80',
+    description: 'Городской рюкзак в спортивном стиле для учебы, работы и поездок.',
     is_featured: false,
     is_new: false,
   },
   {
-    name: "New Balance 574 Core",
-    category: "Shoes",
-    brand: "New Balance",
-    gender: "Unisex",
+    name: 'New Balance 574 Core',
+    category: 'Shoes',
+    brand: 'New Balance',
+    gender: 'Unisex',
     price: 9990,
     oldPrice: 11990,
     rating: 4.6,
     reviews: 67,
-    tag: "Classic",
+    tag: 'Classic',
     stock: 12,
-    sizes: ["39", "40", "41", "42", "43", "44"],
-    colors: ["Gray", "Black"],
-    image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&w=900&q=80",
-    description: "Универсальные кроссовки в ретро-стиле для города и активного отдыха.",
+    sizes: ['39', '40', '41', '42', '43', '44'],
+    colors: ['Gray', 'Black'],
+    image:
+      'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&w=900&q=80',
+    description: 'Универсальные кроссовки в ретро-стиле для города и активного отдыха.',
     is_featured: true,
     is_new: false,
   },
   {
-    name: "Jordan Essentials Track Jacket",
-    category: "Clothes",
-    brand: "Jordan",
-    gender: "Men",
+    name: 'Jordan Essentials Track Jacket',
+    category: 'Clothes',
+    brand: 'Jordan',
+    gender: 'Men',
     price: 8490,
     oldPrice: 9990,
     rating: 4.8,
     reviews: 29,
-    tag: "Premium",
+    tag: 'Premium',
     stock: 11,
-    sizes: ["M", "L", "XL"],
-    colors: ["Red", "Black"],
-    image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80",
-    description: "Легкая олимпийка в баскетбольной эстетике для спорта и streetwear-образов.",
+    sizes: ['M', 'L', 'XL'],
+    colors: ['Red', 'Black'],
+    image:
+      'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80',
+    description: 'Легкая олимпийка в баскетбольной эстетике для спорта и streetwear-образов.',
     is_featured: true,
     is_new: true,
   },
@@ -208,16 +220,16 @@ app.use(
         return;
       }
 
-      callback(new Error("Not allowed by CORS"));
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:1234@localhost:5432/myshop",
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:1234@localhost:5432/myshop',
   ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
@@ -247,6 +259,7 @@ async function initDB() {
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       category VARCHAR(100),
+      subcategory VARCHAR(100),
       brand VARCHAR(100),
       gender VARCHAR(50),
       price DECIMAL(10, 2) NOT NULL,
@@ -265,17 +278,82 @@ async function initDB() {
   `);
 
   await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS subcategory VARCHAR(100);
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       order_number VARCHAR(40) UNIQUE NOT NULL,
       status VARCHAR(30) NOT NULL DEFAULT 'processing',
+      subtotal NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      delivery_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
       total NUMERIC(10, 2) NOT NULL DEFAULT 0,
       total_items INTEGER NOT NULL DEFAULT 0,
       shipping_address TEXT,
+      delivery_method VARCHAR(40) DEFAULT 'courier',
       payment_method VARCHAR(40) DEFAULT 'card',
+      payment_status VARCHAR(30) DEFAULT 'pending',
+      payment_reference VARCHAR(80),
+      payment_provider VARCHAR(80),
+      payment_card_last4 VARCHAR(4),
+      promo_code VARCHAR(60),
+      discount_amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      customer_note TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS subtotal NUMERIC(10, 2) NOT NULL DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10, 2) NOT NULL DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS delivery_method VARCHAR(40) DEFAULT 'courier';
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS customer_note TEXT;
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payment_status VARCHAR(30) DEFAULT 'pending';
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(80);
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(80);
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payment_card_last4 VARCHAR(4);
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS promo_code VARCHAR(60);
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) NOT NULL DEFAULT 0;
   `);
 
   await pool.query(`
@@ -326,7 +404,9 @@ async function initDB() {
   `);
 
   const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-  const existingAdmin = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [ADMIN_EMAIL]);
+  const existingAdmin = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [
+    ADMIN_EMAIL,
+  ]);
 
   if (existingAdmin.rows.length === 0) {
     await pool.query(
@@ -343,18 +423,19 @@ async function initDB() {
     );
   }
 
-  const productsCountResult = await pool.query("SELECT COUNT(*)::int AS count FROM products");
+  const productsCountResult = await pool.query('SELECT COUNT(*)::int AS count FROM products');
   const productsCount = Number(productsCountResult.rows[0]?.count || 0);
 
   if (productsCount === 0) {
     for (const product of starterProducts) {
       await pool.query(
         `INSERT INTO products
-         (name, category, brand, gender, price, old_price, rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+         (name, category, subcategory, brand, gender, price, old_price, rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
         [
           product.name,
           product.category,
+          product.subcategory || null,
           product.brand,
           product.gender,
           product.price,
@@ -380,7 +461,7 @@ function generateOrderNumber() {
 }
 
 function createToken(user) {
-  return jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 }
 
 function sanitizeUser(row) {
@@ -388,9 +469,9 @@ function sanitizeUser(row) {
     id: row.id,
     username: row.username,
     email: row.email,
-    role: row.role || "customer",
-    phone: row.phone || "",
-    address: row.address || "",
+    role: row.role || 'customer',
+    phone: row.phone || '',
+    address: row.address || '',
     createdAt: row.created_at || row.createdAt || null,
   };
 }
@@ -400,9 +481,9 @@ function normalizeArrayInput(value) {
     return value.map((item) => String(item).trim()).filter(Boolean);
   }
 
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return value
-      .split(",")
+      .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
   }
@@ -415,6 +496,7 @@ function mapProduct(row) {
     id: row.id,
     name: row.name,
     category: row.category,
+    subcategory: row.subcategory,
     brand: row.brand,
     gender: row.gender,
     price: Number(row.price || 0),
@@ -434,25 +516,25 @@ function mapProduct(row) {
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: "Доступ запрещен. Вы не авторизованы." });
+    return res.status(401).json({ error: 'Доступ запрещен. Вы не авторизованы.' });
   }
 
   try {
     const verified = jwt.verify(token, JWT_SECRET);
     req.userId = verified.id;
-    req.userRole = verified.role || "customer";
+    req.userRole = verified.role || 'customer';
     next();
   } catch (error) {
-    return res.status(400).json({ error: "Неверный токен" });
+    return res.status(400).json({ error: 'Неверный токен' });
   }
 }
 
 function optionalAuthMiddleware(req, _res, next) {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     next();
@@ -462,7 +544,7 @@ function optionalAuthMiddleware(req, _res, next) {
   try {
     const verified = jwt.verify(token, JWT_SECRET);
     req.userId = verified.id;
-    req.userRole = verified.role || "customer";
+    req.userRole = verified.role || 'customer';
   } catch {
     req.userId = undefined;
     req.userRole = undefined;
@@ -472,8 +554,8 @@ function optionalAuthMiddleware(req, _res, next) {
 }
 
 function adminOnlyMiddleware(req, res, next) {
-  if (req.userRole !== "admin") {
-    return res.status(403).json({ error: "Недостаточно прав для доступа к админке" });
+  if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Недостаточно прав для доступа к админке' });
   }
 
   next();
@@ -481,50 +563,61 @@ function adminOnlyMiddleware(req, res, next) {
 
 function mapOrderStatus(status) {
   const statusMap = {
-    processing: "processing",
-    shipped: "shipped",
-    delivered: "delivered",
+    processing: 'processing',
+    shipped: 'shipped',
+    delivered: 'delivered',
   };
 
-  return statusMap[status] || "processing";
+  return statusMap[status] || 'processing';
 }
 
 function normalizeOrderStatus(status) {
-  const nextStatus = String(status || "").trim().toLowerCase();
+  const nextStatus = String(status || '')
+    .trim()
+    .toLowerCase();
   return mapOrderStatus(nextStatus);
 }
 
 function mapReviewSort(sort) {
-  const normalizedSort = String(sort || "").trim().toLowerCase();
+  const normalizedSort = String(sort || '')
+    .trim()
+    .toLowerCase();
 
   switch (normalizedSort) {
-    case "oldest":
-      return { value: "oldest", orderBy: 'pr.created_at ASC' };
-    case "highest":
-      return { value: "highest", orderBy: 'pr.rating DESC, pr.created_at DESC' };
-    case "lowest":
-      return { value: "lowest", orderBy: 'pr.rating ASC, pr.created_at DESC' };
-    case "popular":
-      return { value: "popular", orderBy: 'COUNT(rl.id) DESC, pr.created_at DESC' };
+    case 'oldest':
+      return { value: 'oldest', orderBy: 'pr.created_at ASC' };
+    case 'highest':
+      return { value: 'highest', orderBy: 'pr.rating DESC, pr.created_at DESC' };
+    case 'lowest':
+      return { value: 'lowest', orderBy: 'pr.rating ASC, pr.created_at DESC' };
+    case 'popular':
+      return { value: 'popular', orderBy: 'COUNT(rl.id) DESC, pr.created_at DESC' };
     default:
-      return { value: "newest", orderBy: 'pr.created_at DESC' };
+      return { value: 'newest', orderBy: 'pr.created_at DESC' };
   }
 }
 
 function mapReviewReportStatus(status) {
-  const normalizedStatus = String(status || "").trim().toLowerCase();
-  if (["pending", "reviewed", "rejected"].includes(normalizedStatus)) {
+  const normalizedStatus = String(status || '')
+    .trim()
+    .toLowerCase();
+  if (['pending', 'reviewed', 'rejected'].includes(normalizedStatus)) {
     return normalizedStatus;
   }
 
-  return "pending";
+  return 'pending';
 }
 
-async function getOrdersWithItems(whereSql = "", params = []) {
+async function getOrdersWithItems(whereSql = '', params = []) {
   const ordersResult = await pool.query(
-    `SELECT o.id, o.user_id AS "userId", o.order_number AS "orderNumber", o.status, o.total,
-            o.total_items AS "totalItems", o.shipping_address AS "shippingAddress",
-            o.payment_method AS "paymentMethod", o.created_at AS "createdAt",
+    `SELECT o.id, o.user_id AS "userId", o.order_number AS "orderNumber", o.status, o.subtotal,
+            o.delivery_fee AS "deliveryFee", o.total, o.total_items AS "totalItems",
+            o.shipping_address AS "shippingAddress", o.delivery_method AS "deliveryMethod",
+            o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus",
+            o.payment_reference AS "paymentReference", o.payment_provider AS "paymentProvider",
+            o.payment_card_last4 AS "paymentCardLast4", o.promo_code AS "promoCode",
+            o.discount_amount AS "discountAmount", o.customer_note AS "customerNote",
+            o.created_at AS "createdAt",
             u.username AS "customerName", u.email AS "customerEmail"
      FROM orders o
      JOIN users u ON u.id = o.user_id
@@ -561,6 +654,9 @@ async function getOrdersWithItems(whereSql = "", params = []) {
 
   return ordersResult.rows.map((order) => ({
     ...order,
+    subtotal: Number(order.subtotal || 0),
+    deliveryFee: Number(order.deliveryFee || 0),
+    discountAmount: Number(order.discountAmount || 0),
     total: Number(order.total || 0),
     totalItems: Number(order.totalItems || 0),
     status: mapOrderStatus(order.status),
@@ -612,18 +708,22 @@ async function hasPurchasedProduct(userId, productId) {
   return result.rows.length > 0;
 }
 
-app.get("/healthz", (_req, res) => {
+app.get('/healthz', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/auth/register", async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedEmail = String(email || '')
+      .trim()
+      .toLowerCase();
 
-    const userExists = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [normalizedEmail]);
+    const userExists = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [
+      normalizedEmail,
+    ]);
     if (userExists.rows.length > 0) {
-      return res.status(400).json({ error: "Пользователь с таким email уже существует" });
+      return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -637,49 +737,104 @@ app.post("/api/auth/register", async (req, res) => {
 
     res.status(201).json({ token, user: newUser });
   } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ error: "Ошибка на сервере" });
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Ошибка на сервере' });
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedEmail = String(email || '')
+      .trim()
+      .toLowerCase();
 
-    const result = await pool.query("SELECT * FROM users WHERE LOWER(email) = $1", [normalizedEmail]);
+    const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [
+      normalizedEmail,
+    ]);
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: "Неверный email или пароль" });
+      return res.status(400).json({ error: 'Неверный email или пароль' });
     }
 
     const dbUser = result.rows[0];
     const isMatch = await bcrypt.compare(password, dbUser.password_hash);
 
     if (!isMatch) {
-      return res.status(400).json({ error: "Неверный email или пароль" });
+      return res.status(400).json({ error: 'Неверный email или пароль' });
     }
 
     const user = sanitizeUser(dbUser);
     res.json({ token: createToken(user), user });
   } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Ошибка на сервере" });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Ошибка на сервере' });
   }
 });
 
-app.get("/api/data", async (req, res) => {
+app.get('/api/data', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id ASC',
+      'SELECT id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id ASC',
     );
     res.json(result.rows.map(mapProduct));
   } catch (error) {
-    console.error("Products error:", error);
+    console.error('Products error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get("/api/products/:id/reviews", optionalAuthMiddleware, async (req, res) => {
+// Server-side search endpoint (fast, optimized for large catalogs)
+app.get('/api/search', async (req, res) => {
+  try {
+    const searchQuery = (req.query.q || '').trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    // If empty search, return all products
+    if (!searchQuery) {
+      const result = await pool.query(
+        'SELECT id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY rating DESC LIMIT $1 OFFSET $2',
+        [limit, offset],
+      );
+      return res.json({
+        results: result.rows.map(mapProduct),
+        total: result.rows.length,
+        query: '',
+      });
+    }
+
+    // Search with LIKE (fast with proper indexes)
+    const searchPattern = `%${searchQuery}%`;
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM products 
+       WHERE name ILIKE $1 OR brand ILIKE $1 OR category ILIKE $1 OR subcategory ILIKE $1`,
+      [searchPattern],
+    );
+
+    const result = await pool.query(
+      `SELECT id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products 
+       WHERE name ILIKE $1 OR brand ILIKE $1 OR category ILIKE $1 OR subcategory ILIKE $1
+       ORDER BY 
+         CASE WHEN name ILIKE $1 THEN 0 ELSE 1 END,
+         rating DESC,
+         reviews DESC
+       LIMIT $2 OFFSET $3`,
+      [searchPattern, limit, offset],
+    );
+
+    res.json({
+      results: result.rows.map(mapProduct),
+      total: countResult.rows[0]?.count || 0,
+      query: searchQuery,
+    });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/products/:id/reviews', optionalAuthMiddleware, async (req, res) => {
   try {
     const productId = Number(req.params.id);
     const { value: sort, orderBy } = mapReviewSort(req.query.sort);
@@ -687,7 +842,7 @@ app.get("/api/products/:id/reviews", optionalAuthMiddleware, async (req, res) =>
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
     const countResult = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM product_reviews WHERE product_id = $1",
+      'SELECT COUNT(*)::int AS count FROM product_reviews WHERE product_id = $1',
       [productId],
     );
 
@@ -714,14 +869,14 @@ app.get("/api/products/:id/reviews", optionalAuthMiddleware, async (req, res) =>
     );
 
     const items = result.rows.map((row) => ({
-        ...row,
-        rating: Number(row.rating || 0),
-        likesCount: Number(row.likesCount || 0),
-        likedByMe: Boolean(row.likedByMe),
-        reportedByMe: Boolean(row.reportedByMe),
-        isOwn: req.userId ? Number(row.userId) === Number(req.userId) : false,
-        isVerifiedPurchase: true,
-      }));
+      ...row,
+      rating: Number(row.rating || 0),
+      likesCount: Number(row.likesCount || 0),
+      likedByMe: Boolean(row.likedByMe),
+      reportedByMe: Boolean(row.reportedByMe),
+      isOwn: req.userId ? Number(row.userId) === Number(req.userId) : false,
+      isVerifiedPurchase: true,
+    }));
 
     const total = Number(countResult.rows[0]?.count || 0);
 
@@ -734,42 +889,42 @@ app.get("/api/products/:id/reviews", optionalAuthMiddleware, async (req, res) =>
       hasMore: offset + items.length < total,
     });
   } catch (error) {
-    console.error("Product reviews fetch error:", error);
-    res.status(500).json({ error: "Не удалось загрузить отзывы" });
+    console.error('Product reviews fetch error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить отзывы' });
   }
 });
 
-app.post("/api/products/:id/reviews", authMiddleware, async (req, res) => {
+app.post('/api/products/:id/reviews', authMiddleware, async (req, res) => {
   try {
     const productId = Number(req.params.id);
     const { rating, comment } = req.body;
-    const normalizedComment = String(comment || "").trim();
+    const normalizedComment = String(comment || '').trim();
     const normalizedRating = Number(rating);
 
     if (!normalizedComment || normalizedComment.length < 8) {
-      return res.status(400).json({ error: "Комментарий должен быть не короче 8 символов" });
+      return res.status(400).json({ error: 'Комментарий должен быть не короче 8 символов' });
     }
 
     if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
-      return res.status(400).json({ error: "Оценка должна быть от 1 до 5" });
+      return res.status(400).json({ error: 'Оценка должна быть от 1 до 5' });
     }
 
-    const productExists = await pool.query("SELECT id FROM products WHERE id = $1", [productId]);
+    const productExists = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
     if (productExists.rows.length === 0) {
-      return res.status(404).json({ error: "Товар не найден" });
+      return res.status(404).json({ error: 'Товар не найден' });
     }
 
     const purchased = await hasPurchasedProduct(req.userId, productId);
     if (!purchased) {
-      return res.status(403).json({ error: "Оставить отзыв можно только после покупки товара" });
+      return res.status(403).json({ error: 'Оставить отзыв можно только после покупки товара' });
     }
 
     const existingReview = await pool.query(
-      "SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2",
+      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
       [productId, req.userId],
     );
     if (existingReview.rows.length > 0) {
-      return res.status(400).json({ error: "Вы уже оставляли отзыв на этот товар" });
+      return res.status(400).json({ error: 'Вы уже оставляли отзыв на этот товар' });
     }
 
     const result = await pool.query(
@@ -781,11 +936,11 @@ app.post("/api/products/:id/reviews", authMiddleware, async (req, res) => {
 
     await refreshProductReviewStats(productId);
 
-    const userResult = await pool.query("SELECT username FROM users WHERE id = $1", [req.userId]);
+    const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [req.userId]);
     res.status(201).json({
       ...result.rows[0],
       rating: Number(result.rows[0].rating || 0),
-      author: userResult.rows[0]?.username || "Пользователь",
+      author: userResult.rows[0]?.username || 'Пользователь',
       likesCount: 0,
       likedByMe: false,
       reportedByMe: false,
@@ -793,25 +948,25 @@ app.post("/api/products/:id/reviews", authMiddleware, async (req, res) => {
       isVerifiedPurchase: true,
     });
   } catch (error) {
-    console.error("Create review error:", error);
-    res.status(500).json({ error: "Не удалось отправить отзыв" });
+    console.error('Create review error:', error);
+    res.status(500).json({ error: 'Не удалось отправить отзыв' });
   }
 });
 
-app.put("/api/products/:productId/reviews/:reviewId", authMiddleware, async (req, res) => {
+app.put('/api/products/:productId/reviews/:reviewId', authMiddleware, async (req, res) => {
   try {
     const productId = Number(req.params.productId);
     const reviewId = Number(req.params.reviewId);
     const { rating, comment } = req.body;
-    const normalizedComment = String(comment || "").trim();
+    const normalizedComment = String(comment || '').trim();
     const normalizedRating = Number(rating);
 
     if (!normalizedComment || normalizedComment.length < 8) {
-      return res.status(400).json({ error: "Комментарий должен быть не короче 8 символов" });
+      return res.status(400).json({ error: 'Комментарий должен быть не короче 8 символов' });
     }
 
     if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
-      return res.status(400).json({ error: "Оценка должна быть от 1 до 5" });
+      return res.status(400).json({ error: 'Оценка должна быть от 1 до 5' });
     }
 
     const result = await pool.query(
@@ -823,18 +978,21 @@ app.put("/api/products/:productId/reviews/:reviewId", authMiddleware, async (req
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Отзыв не найден или недоступен для редактирования" });
+      return res.status(404).json({ error: 'Отзыв не найден или недоступен для редактирования' });
     }
 
     await refreshProductReviewStats(productId);
 
-    const userResult = await pool.query("SELECT username FROM users WHERE id = $1", [req.userId]);
-    const likesResult = await pool.query("SELECT COUNT(*)::int AS count FROM review_likes WHERE review_id = $1", [reviewId]);
+    const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [req.userId]);
+    const likesResult = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM review_likes WHERE review_id = $1',
+      [reviewId],
+    );
 
     res.json({
       ...result.rows[0],
       rating: Number(result.rows[0].rating || 0),
-      author: userResult.rows[0]?.username || "Пользователь",
+      author: userResult.rows[0]?.username || 'Пользователь',
       likesCount: Number(likesResult.rows[0]?.count || 0),
       likedByMe: false,
       reportedByMe: false,
@@ -842,61 +1000,61 @@ app.put("/api/products/:productId/reviews/:reviewId", authMiddleware, async (req
       isVerifiedPurchase: true,
     });
   } catch (error) {
-    console.error("Update review error:", error);
-    res.status(500).json({ error: "Не удалось обновить отзыв" });
+    console.error('Update review error:', error);
+    res.status(500).json({ error: 'Не удалось обновить отзыв' });
   }
 });
 
-app.delete("/api/products/:productId/reviews/:reviewId", authMiddleware, async (req, res) => {
+app.delete('/api/products/:productId/reviews/:reviewId', authMiddleware, async (req, res) => {
   try {
     const productId = Number(req.params.productId);
     const reviewId = Number(req.params.reviewId);
 
     const result = await pool.query(
-      "DELETE FROM product_reviews WHERE id = $1 AND product_id = $2 AND user_id = $3 RETURNING id",
+      'DELETE FROM product_reviews WHERE id = $1 AND product_id = $2 AND user_id = $3 RETURNING id',
       [reviewId, productId, req.userId],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Отзыв не найден или недоступен для удаления" });
+      return res.status(404).json({ error: 'Отзыв не найден или недоступен для удаления' });
     }
 
     await refreshProductReviewStats(productId);
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Delete review error:", error);
-    res.status(500).json({ error: "Не удалось удалить отзыв" });
+    console.error('Delete review error:', error);
+    res.status(500).json({ error: 'Не удалось удалить отзыв' });
   }
 });
 
-app.post("/api/products/:productId/reviews/:reviewId/like", authMiddleware, async (req, res) => {
+app.post('/api/products/:productId/reviews/:reviewId/like', authMiddleware, async (req, res) => {
   try {
     const reviewId = Number(req.params.reviewId);
     const productId = Number(req.params.productId);
 
     const reviewExists = await pool.query(
-      "SELECT id FROM product_reviews WHERE id = $1 AND product_id = $2",
+      'SELECT id FROM product_reviews WHERE id = $1 AND product_id = $2',
       [reviewId, productId],
     );
     if (reviewExists.rows.length === 0) {
-      return res.status(404).json({ error: "Отзыв не найден" });
+      return res.status(404).json({ error: 'Отзыв не найден' });
     }
 
     const existingLike = await pool.query(
-      "SELECT id FROM review_likes WHERE review_id = $1 AND user_id = $2",
+      'SELECT id FROM review_likes WHERE review_id = $1 AND user_id = $2',
       [reviewId, req.userId],
     );
 
     let liked;
     if (existingLike.rows.length > 0) {
-      await pool.query("DELETE FROM review_likes WHERE review_id = $1 AND user_id = $2", [
+      await pool.query('DELETE FROM review_likes WHERE review_id = $1 AND user_id = $2', [
         reviewId,
         req.userId,
       ]);
       liked = false;
     } else {
-      await pool.query("INSERT INTO review_likes (review_id, user_id) VALUES ($1, $2)", [
+      await pool.query('INSERT INTO review_likes (review_id, user_id) VALUES ($1, $2)', [
         reviewId,
         req.userId,
       ]);
@@ -904,7 +1062,7 @@ app.post("/api/products/:productId/reviews/:reviewId/like", authMiddleware, asyn
     }
 
     const likesResult = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM review_likes WHERE review_id = $1",
+      'SELECT COUNT(*)::int AS count FROM review_likes WHERE review_id = $1',
       [reviewId],
     );
 
@@ -914,16 +1072,16 @@ app.post("/api/products/:productId/reviews/:reviewId/like", authMiddleware, asyn
       likesCount: Number(likesResult.rows[0]?.count || 0),
     });
   } catch (error) {
-    console.error("Toggle review like error:", error);
-    res.status(500).json({ error: "Не удалось обновить лайк" });
+    console.error('Toggle review like error:', error);
+    res.status(500).json({ error: 'Не удалось обновить лайк' });
   }
 });
 
-app.post("/api/products/:productId/reviews/:reviewId/report", authMiddleware, async (req, res) => {
+app.post('/api/products/:productId/reviews/:reviewId/report', authMiddleware, async (req, res) => {
   try {
     const reviewId = Number(req.params.reviewId);
     const productId = Number(req.params.productId);
-    const reason = String(req.body?.reason || "").trim() || "spam";
+    const reason = String(req.body?.reason || '').trim() || 'spam';
 
     const reviewResult = await pool.query(
       `SELECT id, user_id AS "userId"
@@ -933,11 +1091,13 @@ app.post("/api/products/:productId/reviews/:reviewId/report", authMiddleware, as
     );
 
     if (reviewResult.rows.length === 0) {
-      return res.status(404).json({ error: "РћС‚Р·С‹РІ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: 'РћС‚Р·С‹РІ РЅРµ РЅР°Р№РґРµРЅ' });
     }
 
     if (Number(reviewResult.rows[0].userId) === Number(req.userId)) {
-      return res.status(400).json({ error: "РќРµР»СЊР·СЏ РїРѕР¶Р°Р»РѕРІР°С‚СЊСЃСЏ РЅР° СЃРІРѕР№ РѕС‚Р·С‹РІ" });
+      return res
+        .status(400)
+        .json({ error: 'РќРµР»СЊР·СЏ РїРѕР¶Р°Р»РѕРІР°С‚СЊСЃСЏ РЅР° СЃРІРѕР№ РѕС‚Р·С‹РІ' });
     }
 
     const result = await pool.query(
@@ -951,30 +1111,30 @@ app.post("/api/products/:productId/reviews/:reviewId/report", authMiddleware, as
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Report review error:", error);
-    res.status(500).json({ error: "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ Р¶Р°Р»РѕР±Сѓ" });
+    console.error('Report review error:', error);
+    res.status(500).json({ error: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ Р¶Р°Р»РѕР±Сѓ' });
   }
 });
 
-app.get("/api/profile", authMiddleware, async (req, res) => {
+app.get('/api/profile', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, username, email, phone, address, avatar, banner, role, created_at FROM users WHERE id = $1",
+      'SELECT id, username, email, phone, address, avatar, banner, role, created_at FROM users WHERE id = $1',
       [req.userId],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
+      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Profile fetch error:", error);
+    console.error('Profile fetch error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put("/api/profile", authMiddleware, async (req, res) => {
+app.put('/api/profile', authMiddleware, async (req, res) => {
   try {
     const { username, email, phone, address, avatar, banner } = req.body;
 
@@ -983,44 +1143,112 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
        SET username = $1, email = $2, phone = $3, address = $4, avatar = $5, banner = $6
        WHERE id = $7
        RETURNING id, username, email, phone, address, avatar, banner, role, created_at`,
-      [username, String(email || "").trim().toLowerCase(), phone, address, avatar, banner, req.userId],
+      [
+        username,
+        String(email || '')
+          .trim()
+          .toLowerCase(),
+        phone,
+        address,
+        avatar,
+        banner,
+        req.userId,
+      ],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
+      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Profile update error:", error);
+    console.error('Profile update error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/orders", authMiddleware, async (req, res) => {
+app.post('/api/orders', authMiddleware, async (req, res) => {
   const client = await pool.connect();
 
   try {
-    const { items = [], shippingAddress = "", paymentMethod = "card" } = req.body;
+    const {
+      items = [],
+      shippingAddress = '',
+      paymentMethod = 'card',
+      deliveryMethod = 'courier',
+      deliveryFee = 0,
+      customerNote = '',
+      promoCode = '',
+      discountAmount = 0,
+      paymentStatus = paymentMethod === 'cash' ? 'pending' : 'paid',
+      paymentReference = '',
+      paymentProvider = '',
+      paymentCardLast4 = '',
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Корзина пуста" });
+      return res.status(400).json({ error: 'Корзина пуста' });
     }
 
-    const total = items.reduce(
+    const subtotal = items.reduce(
       (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
       0,
     );
+    const normalizedDeliveryFee = Math.max(Number(deliveryFee || 0), 0);
+    const normalizedDiscountAmount = Math.min(
+      Math.max(Number(discountAmount || 0), 0),
+      subtotal + normalizedDeliveryFee,
+    );
+    const total = Math.max(subtotal + normalizedDeliveryFee - normalizedDiscountAmount, 0);
     const totalItems = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const orderNumber = generateOrderNumber();
+    const normalizedPaymentStatus = ['paid', 'pending', 'failed'].includes(
+      String(paymentStatus).trim().toLowerCase(),
+    )
+      ? String(paymentStatus).trim().toLowerCase()
+      : 'pending';
+    const normalizedCardLast4 = String(paymentCardLast4 || '')
+      .replace(/\D/g, '')
+      .slice(-4);
 
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
     const orderResult = await client.query(
-      `INSERT INTO orders (user_id, order_number, status, total, total_items, shipping_address, payment_method)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, order_number AS "orderNumber", status, total, total_items AS "totalItems", shipping_address AS "shippingAddress", payment_method AS "paymentMethod", created_at AS "createdAt"`,
-      [req.userId, orderNumber, "processing", total, totalItems, shippingAddress, paymentMethod],
+      `INSERT INTO orders (
+         user_id, order_number, status, subtotal, delivery_fee, total, total_items,
+         shipping_address, delivery_method, payment_method, payment_status, payment_reference,
+         payment_provider, payment_card_last4, promo_code, discount_amount, customer_note
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       RETURNING id, order_number AS "orderNumber", status, subtotal, delivery_fee AS "deliveryFee",
+                 total, total_items AS "totalItems", shipping_address AS "shippingAddress",
+                 delivery_method AS "deliveryMethod", payment_method AS "paymentMethod",
+                 payment_status AS "paymentStatus", payment_reference AS "paymentReference",
+                 payment_provider AS "paymentProvider", payment_card_last4 AS "paymentCardLast4",
+                 promo_code AS "promoCode", discount_amount AS "discountAmount",
+                 customer_note AS "customerNote", created_at AS "createdAt"`,
+      [
+        req.userId,
+        orderNumber,
+        'processing',
+        subtotal,
+        normalizedDeliveryFee,
+        total,
+        totalItems,
+        shippingAddress,
+        deliveryMethod,
+        paymentMethod,
+        normalizedPaymentStatus,
+        String(paymentReference || '').slice(0, 80),
+        String(paymentProvider || '').slice(0, 80),
+        normalizedCardLast4 || null,
+        String(promoCode || '')
+          .trim()
+          .toUpperCase()
+          .slice(0, 60) || null,
+        normalizedDiscountAmount,
+        customerNote || '',
+      ],
     );
 
     const order = orderResult.rows[0];
@@ -1030,7 +1258,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       const quantity = Number(item.quantity || 1);
 
       if (!productId || quantity <= 0) {
-        throw new Error("Некорректный товар в заказе");
+        throw new Error('Некорректный товар в заказе');
       }
 
       const productResult = await client.query(
@@ -1042,15 +1270,15 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       );
 
       if (productResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ error: "Один из товаров больше не найден" });
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Один из товаров больше не найден' });
       }
 
       const product = productResult.rows[0];
       const availableStock = Number(product.stock || 0);
 
       if (availableStock < quantity) {
-        await client.query("ROLLBACK");
+        await client.query('ROLLBACK');
         return res.status(400).json({
           error:
             availableStock > 0
@@ -1066,8 +1294,8 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
           order.id,
           productId,
           item.name,
-          item.image || "",
-          item.brand || "",
+          item.image || '',
+          item.brand || '',
           item.selectedSize || null,
           Number(item.price || 0),
           quantity,
@@ -1082,10 +1310,13 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       );
     }
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
 
     res.status(201).json({
       ...order,
+      subtotal: Number(order.subtotal || 0),
+      deliveryFee: Number(order.deliveryFee || 0),
+      discountAmount: Number(order.discountAmount || 0),
       total: Number(order.total || 0),
       totalItems: Number(order.totalItems || 0),
       items: items.map((item) => ({
@@ -1099,35 +1330,36 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       })),
     });
   } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Create order error:", error);
-    res.status(500).json({ error: "Не удалось оформить заказ" });
+    await client.query('ROLLBACK');
+    console.error('Create order error:', error);
+    res.status(500).json({ error: 'Не удалось оформить заказ' });
   } finally {
     client.release();
   }
 });
 
-app.get("/api/orders", authMiddleware, async (req, res) => {
+app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    const orders = await getOrdersWithItems("WHERE o.user_id = $1", [req.userId]);
+    const orders = await getOrdersWithItems('WHERE o.user_id = $1', [req.userId]);
     res.json(orders);
   } catch (error) {
-    console.error("Orders fetch error:", error);
-    res.status(500).json({ error: "Не удалось загрузить заказы" });
+    console.error('Orders fetch error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить заказы' });
   }
 });
 
-app.get("/api/admin/overview", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.get('/api/admin/overview', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
-    const [productsResult, ordersResult, usersResult, revenueResult, reviewReportsResult] = await Promise.all([
-      pool.query("SELECT COUNT(*)::int AS count FROM products"),
-      pool.query("SELECT COUNT(*)::int AS count FROM orders"),
-      pool.query("SELECT COUNT(*)::int AS count FROM users"),
-      pool.query("SELECT COALESCE(SUM(total), 0)::numeric AS total FROM orders"),
-      pool.query("SELECT COUNT(*)::int AS count FROM review_reports WHERE status = 'pending'"),
-    ]);
+    const [productsResult, ordersResult, usersResult, revenueResult, reviewReportsResult] =
+      await Promise.all([
+        pool.query('SELECT COUNT(*)::int AS count FROM products'),
+        pool.query('SELECT COUNT(*)::int AS count FROM orders'),
+        pool.query('SELECT COUNT(*)::int AS count FROM users'),
+        pool.query('SELECT COALESCE(SUM(total), 0)::numeric AS total FROM orders'),
+        pool.query("SELECT COUNT(*)::int AS count FROM review_reports WHERE status = 'pending'"),
+      ]);
 
-    const recentOrders = await getOrdersWithItems("", []);
+    const recentOrders = await getOrdersWithItems('', []);
 
     res.json({
       stats: {
@@ -1144,12 +1376,12 @@ app.get("/api/admin/overview", authMiddleware, adminOnlyMiddleware, async (req, 
       },
     });
   } catch (error) {
-    console.error("Admin overview error:", error);
-    res.status(500).json({ error: "Не удалось загрузить обзор админки" });
+    console.error('Admin overview error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить обзор админки' });
   }
 });
 
-app.get("/api/admin/users", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.get('/api/admin/users', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u.id, u.username, u.email, u.phone, u.address, u.role, u.created_at,
@@ -1169,18 +1401,18 @@ app.get("/api/admin/users", authMiddleware, adminOnlyMiddleware, async (req, res
       })),
     );
   } catch (error) {
-    console.error("Admin users fetch error:", error);
-    res.status(500).json({ error: "Не удалось загрузить пользователей" });
+    console.error('Admin users fetch error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить пользователей' });
   }
 });
 
-app.put("/api/admin/users/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.put('/api/admin/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const userId = Number(req.params.id);
     const { username, email, phone, address, role } = req.body;
 
-    if (userId === req.userId && role !== "admin") {
-      return res.status(400).json({ error: "Нельзя снять роль admin у текущего аккаунта" });
+    if (userId === req.userId && role !== 'admin') {
+      return res.status(400).json({ error: 'Нельзя снять роль admin у текущего аккаунта' });
     }
 
     const result = await pool.query(
@@ -1192,58 +1424,68 @@ app.put("/api/admin/users/:id", authMiddleware, adminOnlyMiddleware, async (req,
            role = $5
        WHERE id = $6
        RETURNING id, username, email, phone, address, role, created_at`,
-      [username, String(email || "").trim().toLowerCase(), phone || "", address || "", role === "admin" ? "admin" : "customer", userId],
+      [
+        username,
+        String(email || '')
+          .trim()
+          .toLowerCase(),
+        phone || '',
+        address || '',
+        role === 'admin' ? 'admin' : 'customer',
+        userId,
+      ],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
+      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     res.json(sanitizeUser(result.rows[0]));
   } catch (error) {
-    console.error("Admin user update error:", error);
-    res.status(500).json({ error: "Не удалось обновить пользователя" });
+    console.error('Admin user update error:', error);
+    res.status(500).json({ error: 'Не удалось обновить пользователя' });
   }
 });
 
-app.delete("/api/admin/users/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.delete('/api/admin/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const userId = Number(req.params.id);
 
     if (userId === req.userId) {
-      return res.status(400).json({ error: "Нельзя удалить текущего администратора" });
+      return res.status(400).json({ error: 'Нельзя удалить текущего администратора' });
     }
 
-    const result = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id", [userId]);
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
+      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Admin delete user error:", error);
-    res.status(500).json({ error: "Не удалось удалить пользователя" });
+    console.error('Admin delete user error:', error);
+    res.status(500).json({ error: 'Не удалось удалить пользователя' });
   }
 });
 
-app.get("/api/admin/products", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.get('/api/admin/products', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id DESC',
+      'SELECT id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new FROM products ORDER BY id DESC',
     );
     res.json(result.rows.map(mapProduct));
   } catch (error) {
-    console.error("Admin products fetch error:", error);
-    res.status(500).json({ error: "Не удалось загрузить товары" });
+    console.error('Admin products fetch error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить товары' });
   }
 });
 
-app.post("/api/admin/products", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.post('/api/admin/products', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const {
       name,
       category,
+      subcategory,
       brand,
       gender,
       price,
@@ -1262,12 +1504,13 @@ app.post("/api/admin/products", authMiddleware, adminOnlyMiddleware, async (req,
 
     const result = await pool.query(
       `INSERT INTO products
-       (name, category, brand, gender, price, old_price, rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-       RETURNING id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new`,
+       (name, category, subcategory, brand, gender, price, old_price, rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       RETURNING id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new`,
       [
         name,
         category || null,
+        subcategory || null,
         brand || null,
         gender || null,
         Number(price || 0),
@@ -1287,16 +1530,17 @@ app.post("/api/admin/products", authMiddleware, adminOnlyMiddleware, async (req,
 
     res.status(201).json(mapProduct(result.rows[0]));
   } catch (error) {
-    console.error("Admin create product error:", error);
-    res.status(500).json({ error: "Не удалось создать товар" });
+    console.error('Admin create product error:', error);
+    res.status(500).json({ error: 'Не удалось создать товар' });
   }
 });
 
-app.put("/api/admin/products/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.put('/api/admin/products/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const {
       name,
       category,
+      subcategory,
       brand,
       gender,
       price,
@@ -1317,25 +1561,27 @@ app.put("/api/admin/products/:id", authMiddleware, adminOnlyMiddleware, async (r
       `UPDATE products
        SET name = $1,
            category = $2,
-           brand = $3,
-           gender = $4,
-           price = $5,
-           old_price = $6,
-           rating = $7,
-           reviews = $8,
-           tag = $9,
-           stock = $10,
-           sizes = $11,
-           colors = $12,
-           image = $13,
-           description = $14,
-           is_featured = $15,
-           is_new = $16
-       WHERE id = $17
-       RETURNING id, name, category, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new`,
+           subcategory = $3,
+           brand = $4,
+           gender = $5,
+           price = $6,
+           old_price = $7,
+           rating = $8,
+           reviews = $9,
+           tag = $10,
+           stock = $11,
+           sizes = $12,
+           colors = $13,
+           image = $14,
+           description = $15,
+           is_featured = $16,
+           is_new = $17
+       WHERE id = $18
+       RETURNING id, name, category, subcategory, brand, gender, price, old_price AS "oldPrice", rating, reviews, tag, stock, sizes, colors, image, description, is_featured, is_new`,
       [
         name,
         category || null,
+        subcategory || null,
         brand || null,
         gender || null,
         Number(price || 0),
@@ -1355,44 +1601,44 @@ app.put("/api/admin/products/:id", authMiddleware, adminOnlyMiddleware, async (r
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Товар не найден" });
+      return res.status(404).json({ error: 'Товар не найден' });
     }
 
     res.json(mapProduct(result.rows[0]));
   } catch (error) {
-    console.error("Admin update product error:", error);
-    res.status(500).json({ error: "Не удалось обновить товар" });
+    console.error('Admin update product error:', error);
+    res.status(500).json({ error: 'Не удалось обновить товар' });
   }
 });
 
-app.delete("/api/admin/products/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.delete('/api/admin/products/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
-    const result = await pool.query("DELETE FROM products WHERE id = $1 RETURNING id", [
+    const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING id', [
       Number(req.params.id),
     ]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Товар не найден" });
+      return res.status(404).json({ error: 'Товар не найден' });
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Admin delete product error:", error);
-    res.status(500).json({ error: "Не удалось удалить товар" });
+    console.error('Admin delete product error:', error);
+    res.status(500).json({ error: 'Не удалось удалить товар' });
   }
 });
 
-app.get("/api/admin/orders", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.get('/api/admin/orders', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
-    const orders = await getOrdersWithItems("", []);
+    const orders = await getOrdersWithItems('', []);
     res.json(orders);
   } catch (error) {
-    console.error("Admin orders fetch error:", error);
-    res.status(500).json({ error: "Не удалось загрузить заказы" });
+    console.error('Admin orders fetch error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить заказы' });
   }
 });
 
-app.put("/api/admin/orders/:id/status", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.put('/api/admin/orders/:id/status', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const status = normalizeOrderStatus(req.body.status);
     const result = await pool.query(
@@ -1404,22 +1650,24 @@ app.put("/api/admin/orders/:id/status", authMiddleware, adminOnlyMiddleware, asy
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Заказ не найден" });
+      return res.status(404).json({ error: 'Заказ не найден' });
     }
 
     res.json({
       ...result.rows[0],
+      subtotal: Number(result.rows[0].subtotal || 0),
+      deliveryFee: Number(result.rows[0].deliveryFee || 0),
       total: Number(result.rows[0].total || 0),
       totalItems: Number(result.rows[0].totalItems || 0),
       status: mapOrderStatus(result.rows[0].status),
     });
   } catch (error) {
-    console.error("Admin update order status error:", error);
-    res.status(500).json({ error: "Не удалось обновить статус заказа" });
+    console.error('Admin update order status error:', error);
+    res.status(500).json({ error: 'Не удалось обновить статус заказа' });
   }
 });
 
-app.get("/api/admin/review-reports", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.get('/api/admin/review-reports', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rr.id,
@@ -1451,12 +1699,14 @@ app.get("/api/admin/review-reports", authMiddleware, adminOnlyMiddleware, async 
       })),
     );
   } catch (error) {
-    console.error("Admin review reports fetch error:", error);
-    res.status(500).json({ error: "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р¶Р°Р»РѕР±С‹ РЅР° РѕС‚Р·С‹РІС‹" });
+    console.error('Admin review reports fetch error:', error);
+    res
+      .status(500)
+      .json({ error: 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р¶Р°Р»РѕР±С‹ РЅР° РѕС‚Р·С‹РІС‹' });
   }
 });
 
-app.put("/api/admin/review-reports/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.put('/api/admin/review-reports/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const nextStatus = mapReviewReportStatus(req.body?.status);
     const result = await pool.query(
@@ -1468,46 +1718,48 @@ app.put("/api/admin/review-reports/:id", authMiddleware, adminOnlyMiddleware, as
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Р–Р°Р»РѕР±Р° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: 'Р–Р°Р»РѕР±Р° РЅРµ РЅР°Р№РґРµРЅР°' });
     }
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Admin review report update error:", error);
-    res.status(500).json({ error: "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ Р¶Р°Р»РѕР±С‹" });
+    console.error('Admin review report update error:', error);
+    res
+      .status(500)
+      .json({ error: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ Р¶Р°Р»РѕР±С‹' });
   }
 });
 
-app.delete("/api/admin/reviews/:id", authMiddleware, adminOnlyMiddleware, async (req, res) => {
+app.delete('/api/admin/reviews/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const reviewId = Number(req.params.id);
     const reviewResult = await pool.query(
-      "DELETE FROM product_reviews WHERE id = $1 RETURNING id, product_id AS \"productId\"",
+      'DELETE FROM product_reviews WHERE id = $1 RETURNING id, product_id AS "productId"',
       [reviewId],
     );
 
     if (reviewResult.rows.length === 0) {
-      return res.status(404).json({ error: "РћС‚Р·С‹РІ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: 'РћС‚Р·С‹РІ РЅРµ РЅР°Р№РґРµРЅ' });
     }
 
     await refreshProductReviewStats(reviewResult.rows[0].productId);
     res.json({ success: true, reviewId });
   } catch (error) {
-    console.error("Admin delete review error:", error);
-    res.status(500).json({ error: "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РѕС‚Р·С‹РІ" });
+    console.error('Admin delete review error:', error);
+    res.status(500).json({ error: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РѕС‚Р·С‹РІ' });
   }
 });
 
 pool
   .connect()
   .then(async (client) => {
-    console.log("Connected to PostgreSQL");
+    console.log('Connected to PostgreSQL');
     client.release();
     await initDB();
-    console.log("Database structure is ready");
+    console.log('Database structure is ready');
     console.log(`Admin ready: ${ADMIN_EMAIL}`);
   })
-  .catch((error) => console.error("Database connection error:", error));
+  .catch((error) => console.error('Database connection error:', error));
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
